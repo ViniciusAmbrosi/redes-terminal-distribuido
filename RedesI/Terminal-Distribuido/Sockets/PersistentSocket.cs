@@ -21,7 +21,7 @@ namespace Terminal_Distribuido.Sockets
         {
             this.SocketConnection = socketConnection;
             this.Address = address;
-            CallbackDelegate = callbackDelegate;
+            this.CallbackDelegate = callbackDelegate;
         }
 
         public void HandleIncoming()
@@ -44,7 +44,6 @@ namespace Terminal_Distribuido.Sockets
                 //fire event about message received
                 CallbackDelegate(msg);
             }
-
         }
 
         public void SendMessage(byte[] message)

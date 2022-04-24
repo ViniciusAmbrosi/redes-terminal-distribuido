@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Terminal_Distribuido.Sockets;
 
 public class P2PClient
@@ -12,6 +13,23 @@ public class P2PClient
 
     public static int Main(String[] args)
     {
+        InitiateOutgoingSocketConnection();
+        ListenForIncomingSocketConnections();
+
+        while (true)
+        {
+            string? message = Console.ReadLine();
+            byte[] msg = Encoding.ASCII.GetBytes(message);
+
+            // Propagate data to all sockets
+            HandlePropagation(msg);
+        }
+
+        return 0;
+    }
+
+    public static void InitiateOutgoingSocketConnection()
+    {
         Console.WriteLine("Provide target environment IP address");
         string? targetEnvironment = Console.ReadLine();
 
@@ -19,12 +37,15 @@ public class P2PClient
         string? targetPort = Console.ReadLine();
 
         StartClient(targetEnvironment, targetPort);
+    }
 
+    public static void ListenForIncomingSocketConnections()
+    {
         Console.WriteLine("Provide this server port for socket server");
         string? serverPort = Console.ReadLine();
 
-        StartServer(serverPort);
-        return 0;
+        Thread maintainedSocketThread = new Thread(() => StartServer(serverPort));
+        maintainedSocketThread.Start();
     }
 
     public static void StartClient(string? targetEnvironment, string? targetPort)
@@ -101,16 +122,17 @@ public class P2PClient
             while (true)
             {
                 socket = listener.Accept();
-
-                Console.WriteLine("\nReceived connection request...");
+                IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString());
+                
+                Console.WriteLine("\nReceived connection request from {0}", sourceIp.ToString());
 
                 IncomingPersistentSocket persistentSocket  = new IncomingPersistentSocket(
-                    socket, 
-                    IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString()),
+                    socket,
+                    sourceIp,
                     HandlePropagation);
 
                 persistentSocket.CreateMonitoringThread();
-                incomingPeers.TryAdd(IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString()).ToString(), persistentSocket);
+                incomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
             }
 
             socket.Shutdown(SocketShutdown.Both);
