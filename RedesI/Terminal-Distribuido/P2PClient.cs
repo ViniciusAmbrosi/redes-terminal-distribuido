@@ -22,7 +22,7 @@ public class P2PClient
             byte[] msg = Encoding.ASCII.GetBytes(message);
 
             // Propagate data to all sockets
-            HandlePropagation(msg);
+            PropagateOutgoingMessage(msg);
         }
 
         return 0;
@@ -70,7 +70,7 @@ public class P2PClient
 
                 Console.WriteLine("Socket connected to {0}", sender?.RemoteEndPoint?.ToString());
 
-                OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(sender, ipAddress, HandlePropagation);
+                OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(sender, ipAddress, PropagateIncomingSocketMessageDelegate);
 
                 persistent.CreateMonitoringThread();
                 outgoingPeer = persistent;
@@ -129,7 +129,7 @@ public class P2PClient
                 IncomingPersistentSocket persistentSocket  = new IncomingPersistentSocket(
                     socket,
                     sourceIp,
-                    HandlePropagation);
+                    PropagateIncomingSocketMessageDelegate);
 
                 persistentSocket.CreateMonitoringThread();
                 incomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
@@ -148,7 +148,7 @@ public class P2PClient
     }
 
     // Create a method for a delegate.
-    public static void HandlePropagation(byte[] message)
+    public static void PropagateOutgoingMessage(byte[] message)
     {
         try
         {
@@ -163,6 +163,41 @@ public class P2PClient
             if (outgoingPeer != null)
             {
                 outgoingPeer.SendMessage(message);
+            }
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
+    }
+
+    public static void PropagateIncomingSocketMessageDelegate(byte[] message, IPAddress address)
+    {
+        try
+        {
+            Semaphore.Wait();
+
+            foreach (var incomingPeer in incomingPeers)
+            {
+                string? incomingPeerAddress = incomingPeer.Value.Address.ToString();
+                if (!incomingPeerAddress.Equals(address.ToString()))
+                {
+                    incomingPeer.Value.SendMessage(message);
+                }
+                else
+                {
+                    Console.WriteLine("Skipping Loop. From {0} | To {1}", address.ToString(), incomingPeerAddress);
+                }
+            }
+
+            string? outgoingPeerAddress = outgoingPeer?.Address?.ToString();
+            if (outgoingPeer != null && outgoingPeerAddress != null && !outgoingPeerAddress.Equals(address.ToString()))
+            {
+                outgoingPeer.SendMessage(message);
+            }
+            else 
+            {
+                Console.WriteLine("Skipping Loop. From {0} | To {1}", address.ToString(), outgoingPeerAddress);
             }
         }
         finally

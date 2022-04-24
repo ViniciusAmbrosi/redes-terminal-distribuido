@@ -2,16 +2,14 @@
 using System.Net.Sockets;
 using System.Text;
 
-
 namespace Terminal_Distribuido.Sockets
 {
-
-    public delegate void PropagateDelegate(byte[] message);
+    public delegate void PropagateDelegate(byte[] message, IPAddress address);
 
     public class PersistentSocket
     {
         protected Socket SocketConnection { get; set; }
-        protected IPAddress Address { get; set; }
+        public IPAddress Address { get; protected set; }
         protected PropagateDelegate CallbackDelegate { get; set; }
 
         public PersistentSocket(
@@ -34,15 +32,12 @@ namespace Terminal_Distribuido.Sockets
                 int bytesReceived = SocketConnection.Receive(incomingDataBytes);
                 incomingDataFromSocket += Encoding.ASCII.GetString(incomingDataBytes, 0, bytesReceived);
 
-                byte[] msg;
+                byte[] msg = Encoding.ASCII.GetBytes(incomingDataFromSocket);
 
                 Console.WriteLine("Command received from {0} -> {1}", Address.ToString(), incomingDataFromSocket);
-                //msg = Encoding.ASCII.GetBytes(incomingDataFromSocket);
-
-                msg = Encoding.ASCII.GetBytes("Message Processed");
 
                 //fire event about message received
-                CallbackDelegate(msg);
+                CallbackDelegate(msg, Address);
             }
         }
 

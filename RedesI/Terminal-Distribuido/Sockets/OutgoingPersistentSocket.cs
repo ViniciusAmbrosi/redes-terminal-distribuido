@@ -17,21 +17,6 @@ namespace Terminal_Distribuido.Sockets
         {
             Thread incomingSocketThread = new Thread(HandleIncoming);
             incomingSocketThread.Start();
-
-            //Thread outgoingSocketThread = new Thread(HanldeOutgoing);
-            //outgoingSocketThread.Start();
         }
-
-        //public void HanldeOutgoing()
-        //{
-        //    while (true)
-        //    {
-        //        string? message = Console.ReadLine();
-        //        byte[] msg = Encoding.ASCII.GetBytes(message);
-
-        //        // Send the data through the socket.
-        //        int bytesSent = SocketConnection.Send(msg);
-        //    }
-        //}
     }
 }
