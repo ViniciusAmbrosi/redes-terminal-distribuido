@@ -46,5 +46,10 @@ namespace Terminal_Distribuido.Sockets
             }
 
         }
+
+        public void SendMessage(byte[] message)
+        {
+            SocketConnection.Send(message);
+        }
     }
 }

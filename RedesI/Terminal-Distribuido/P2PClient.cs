@@ -52,6 +52,7 @@ public class P2PClient
                 OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(sender, ipAddress, HandlePropagation);
 
                 persistent.CreateMonitoringThread();
+                outgoingPeer = persistent;
             }
             catch (ArgumentNullException ane)
             {
@@ -75,7 +76,7 @@ public class P2PClient
     public static void StartServer(string? serverPort)
     {
         int port = 0;
-        if (String.IsNullOrEmpty(serverPort) && !int.TryParse(serverPort, out port))
+        if (String.IsNullOrEmpty(serverPort) || !int.TryParse(serverPort, out port))
         {
             Console.WriteLine("Server port not provided. Interrupting flow.");
             return;
@@ -109,6 +110,7 @@ public class P2PClient
                     HandlePropagation);
 
                 persistentSocket.CreateMonitoringThread();
+                incomingPeers.TryAdd(IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString()).ToString(), persistentSocket);
             }
 
             socket.Shutdown(SocketShutdown.Both);
@@ -130,7 +132,16 @@ public class P2PClient
         {
             Semaphore.Wait();
 
-            Console.WriteLine(message);
+            foreach (var clientEntry in incomingPeers)
+            {
+                PersistentSocket targetSocket = clientEntry.Value;
+                targetSocket.SendMessage(message);
+            }
+
+            if (outgoingPeer != null)
+            {
+                outgoingPeer.SendMessage(message);
+            }
         }
         finally
         {
