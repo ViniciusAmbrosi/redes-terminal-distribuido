@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using Terminal_Distribuido.Terminal;
 
 namespace Terminal_Distribuido.Sockets
 {
@@ -8,8 +9,9 @@ namespace Terminal_Distribuido.Sockets
         public IncomingPersistentSocket(
             Socket socketConnection,
             IPAddress address,
-            PropagateDelegate callbackDelegate) : 
-            base(socketConnection, address, callbackDelegate)
+            PropagateDelegate callbackDelegate,
+            TerminalManager terminalManager) : 
+            base(socketConnection, address, callbackDelegate, terminalManager)
         {
         }
 

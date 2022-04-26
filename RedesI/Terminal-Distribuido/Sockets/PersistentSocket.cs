@@ -1,7 +1,10 @@
-﻿using System.Diagnostics;
+﻿using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Terminal_Distribuido.Terminal;
+using static P2PClient;
 
 namespace Terminal_Distribuido.Sockets
 {
@@ -12,15 +15,18 @@ namespace Terminal_Distribuido.Sockets
         protected Socket SocketConnection { get; set; }
         public IPAddress Address { get; protected set; }
         protected PropagateDelegate CallbackDelegate { get; set; }
+        protected TerminalManager TerminalManager { get; set; }
 
         public PersistentSocket(
             Socket socketConnection,
             IPAddress address,
-            PropagateDelegate callbackDelegate)
+            PropagateDelegate callbackDelegate,
+            TerminalManager terminalManager)
         {
             this.SocketConnection = socketConnection;
             this.Address = address;
             this.CallbackDelegate = callbackDelegate;
+            this.TerminalManager = terminalManager;
         }
 
         public void HandleIncoming()
@@ -33,21 +39,11 @@ namespace Terminal_Distribuido.Sockets
                 int bytesReceived = SocketConnection.Receive(incomingDataBytes);
                 incomingDataFromSocket += Encoding.ASCII.GetString(incomingDataBytes, 0, bytesReceived);
 
-                Process process = new System.Diagnostics.Process();
+                Hello hello = JToken.Parse(incomingDataFromSocket).ToObject<Hello>();
 
-                //process.StartInfo.FileName = "cmd.exe";
-                //process.StartInfo.Arguments = "/C " + message;
-
-                process.StartInfo.FileName = "/bin/bash";
-                process.StartInfo.Arguments = "-c " + "\"" + incomingDataFromSocket + "\"";
-                process.StartInfo.RedirectStandardOutput = true;
-                process.StartInfo.RedirectStandardInput = true;
-                process.StartInfo.UseShellExecute = false;
-                process.StartInfo.RedirectStandardError = true;
-                process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-                process.Start();
-
-                Console.WriteLine(process.StandardOutput.ReadToEnd());
+                string response = TerminalManager.ExecuteCommand(incomingDataFromSocket);
+                Console.WriteLine("Triggering remote command execution triggered by {0}", Address.ToString());
+                Console.WriteLine(response);
 
                 byte[] msg = Encoding.ASCII.GetBytes(incomingDataFromSocket);
 

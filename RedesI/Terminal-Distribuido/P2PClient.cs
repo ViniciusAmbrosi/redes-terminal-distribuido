@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics;
+﻿using Newtonsoft.Json.Linq;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -13,41 +13,40 @@ public class P2PClient
 
     private static SemaphoreSlim Semaphore = new SemaphoreSlim(1);
 
+    private static TerminalManager terminalManager = new TerminalManager();
+
+    public class Hello {
+        public Hello(string command, bool isRequest, bool isResponse)
+        {
+            this.command = command;
+            this.isRequest = isRequest;
+            this.isResponse = isResponse;
+        }
+
+        public string command { get; set; } 
+        public bool isRequest { get; set; }
+        public bool isResponse { get; set; }
+    }
+
     public static int Main(String[] args)
     {
-        TerminalManager terminal = new TerminalManager();
-
         InitiateOutgoingSocketConnection();
         ListenForIncomingSocketConnections();
 
         while (true)
         {
             string? message = Console.ReadLine();
-            byte[] msg = Encoding.ASCII.GetBytes(message);
+            Hello hello = new Hello(message, true, false);
+            
+            byte[] msg = Encoding.ASCII.GetBytes(JToken.FromObject(hello).ToString());
 
-            string commandResult = terminal.ExecuteCommand(message);
-
-            //Process process = new System.Diagnostics.Process();
-
-            ////process.StartInfo.FileName = "cmd.exe";
-            ////process.StartInfo.Arguments = "/C " + message;
-
-            //process.StartInfo.FileName = "/bin/bash";
-            //process.StartInfo.Arguments = "-c " + "\"" + message + "\"";
-            //process.StartInfo.RedirectStandardOutput = true;
-            //process.StartInfo.RedirectStandardInput = true;
-            //process.StartInfo.UseShellExecute = false;
-            //process.StartInfo.RedirectStandardError = true;
-            //process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-            //process.Start();
-
-            Console.WriteLine(commandResult);
+            string commandResult = terminalManager.ExecuteCommand(message);
+            Console.WriteLine("Source system result");
+            Console.WriteLine($"{commandResult}\n");
 
             // Propagate data to all sockets
             PropagateOutgoingMessage(msg);
         }
-
-        return 0;
     }
 
     public static void InitiateOutgoingSocketConnection()
@@ -92,7 +91,7 @@ public class P2PClient
 
                 Console.WriteLine("Socket connected to {0}", sender?.RemoteEndPoint?.ToString());
 
-                OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(sender, ipAddress, PropagateIncomingSocketMessageDelegate);
+                OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(sender, ipAddress, PropagateIncomingSocketMessageDelegate, terminalManager);
 
                 persistent.CreateMonitoringThread();
                 outgoingPeer = persistent;
@@ -151,7 +150,8 @@ public class P2PClient
                 IncomingPersistentSocket persistentSocket  = new IncomingPersistentSocket(
                     socket,
                     sourceIp,
-                    PropagateIncomingSocketMessageDelegate);
+                    PropagateIncomingSocketMessageDelegate,
+                    terminalManager);
 
                 persistentSocket.CreateMonitoringThread();
                 incomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
