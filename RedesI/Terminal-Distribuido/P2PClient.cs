@@ -1,8 +1,10 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Terminal_Distribuido.Sockets;
+using Terminal_Distribuido.Terminal;
 
 public class P2PClient
 {
@@ -13,6 +15,8 @@ public class P2PClient
 
     public static int Main(String[] args)
     {
+        TerminalManager terminal = new TerminalManager();
+
         InitiateOutgoingSocketConnection();
         ListenForIncomingSocketConnections();
 
@@ -20,6 +24,24 @@ public class P2PClient
         {
             string? message = Console.ReadLine();
             byte[] msg = Encoding.ASCII.GetBytes(message);
+
+            string commandResult = terminal.ExecuteCommand(message);
+
+            //Process process = new System.Diagnostics.Process();
+
+            ////process.StartInfo.FileName = "cmd.exe";
+            ////process.StartInfo.Arguments = "/C " + message;
+
+            //process.StartInfo.FileName = "/bin/bash";
+            //process.StartInfo.Arguments = "-c " + "\"" + message + "\"";
+            //process.StartInfo.RedirectStandardOutput = true;
+            //process.StartInfo.RedirectStandardInput = true;
+            //process.StartInfo.UseShellExecute = false;
+            //process.StartInfo.RedirectStandardError = true;
+            //process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+            //process.Start();
+
+            Console.WriteLine(commandResult);
 
             // Propagate data to all sockets
             PropagateOutgoingMessage(msg);

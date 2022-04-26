@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -31,6 +32,22 @@ namespace Terminal_Distribuido.Sockets
 
                 int bytesReceived = SocketConnection.Receive(incomingDataBytes);
                 incomingDataFromSocket += Encoding.ASCII.GetString(incomingDataBytes, 0, bytesReceived);
+
+                Process process = new System.Diagnostics.Process();
+
+                //process.StartInfo.FileName = "cmd.exe";
+                //process.StartInfo.Arguments = "/C " + message;
+
+                process.StartInfo.FileName = "/bin/bash";
+                process.StartInfo.Arguments = "-c " + "\"" + incomingDataFromSocket + "\"";
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardInput = true;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.RedirectStandardError = true;
+                process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+                process.Start();
+
+                Console.WriteLine(process.StandardOutput.ReadToEnd());
 
                 byte[] msg = Encoding.ASCII.GetBytes(incomingDataFromSocket);
 
