@@ -5,7 +5,7 @@ using Terminal_Distribuido.Protocols;
 
 namespace Terminal_Distribuido.Sockets
 {
-    public delegate void PropagateRequestDelegate(byte[] message, IPAddress address);
+    public delegate void PropagateRequestDelegate(CommandRequestProtocol request, IPAddress address);
 
     public delegate void HandleResponseDelegate(CommandRequestProtocol response);
 

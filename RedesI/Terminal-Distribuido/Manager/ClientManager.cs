@@ -196,7 +196,7 @@ public class ClientManager
         }
     }
 
-    public void PropagateToKnownPeersWithoutLoop(byte[] message, IPAddress address)
+    public void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address)
     {
         string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
 
@@ -204,7 +204,17 @@ public class ClientManager
             outgoingPeerAddress != null &&
             !outgoingPeerAddress.Equals(address.ToString()))
         {
-            OutgoingPeer.SendMessage(message);
+            CommandRequestProtocol commandRequest =
+                new CommandRequestProtocol(
+                    request.OriginatorAddress, 
+                    null,
+                    new Stack<string>(request.AddressStack), 
+                    request.Message, 
+                    false);
+
+            commandRequest.AddressStack.Push(outgoingPeerAddress);
+
+            OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
         }
 
         foreach (var incomingPeer in IncomingPeers)
@@ -213,7 +223,17 @@ public class ClientManager
 
             if (!incomingPeerAddress.Equals(address.ToString()))
             {
-                incomingPeer.Value.SendMessage(message);
+                CommandRequestProtocol commandRequest =
+                    new CommandRequestProtocol(
+                        request.OriginatorAddress,
+                        null,
+                        new Stack<string>(request.AddressStack),
+                        request.Message,
+                        false);
+
+                commandRequest.AddressStack.Push(incomingPeerAddress);
+
+                incomingPeer.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
             }
         }
     }

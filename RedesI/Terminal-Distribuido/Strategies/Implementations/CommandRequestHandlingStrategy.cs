@@ -56,8 +56,7 @@ namespace Terminal_Distribuido.Strategies
                 HandleResponseDelegate(responseRequest);
 
                 //continue to propagate request
-                commandRequeustProtocol.AddressStack.Push(persistentSocket.Address.ToString());
-                PropagateRequestDelegate(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequeustProtocol), persistentSocket.Address);
+                PropagateRequestDelegate(commandRequeustProtocol, persistentSocket.Address);
             }
         }
     }
