@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
@@ -94,7 +95,8 @@ public class P2PClient
                     ipAddress, 
                     PropagateIncomingSocketMessageDelegate, 
                     HandleResponseDelegate, 
-                    TerminalManager);
+                    TerminalManager,
+                    true);
 
                 persistent.CreateMonitoringThread();
                 OutgoingPeer = persistent;
@@ -144,19 +146,22 @@ public class P2PClient
             while (true)
             {
                 socket = listener.Accept();
+
                 IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString());
-                
                 Console.WriteLine("\nReceived connection request from {0}", sourceIp.ToString());
 
                 IncomingPersistentSocket persistentSocket  = new IncomingPersistentSocket(
                     socket,
-                    sourceIp,
+                    ClientIpAddress,
                     PropagateIncomingSocketMessageDelegate,
                     HandleResponseDelegate,
-                    TerminalManager);
+                    TerminalManager,
+                    false);
 
                 persistentSocket.CreateMonitoringThread();
                 IncomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
+
+                socket.Send(Encoding.ASCII.GetBytes(ClientIpAddress.ToString()));
             }
 
             socket.Shutdown(SocketShutdown.Both);

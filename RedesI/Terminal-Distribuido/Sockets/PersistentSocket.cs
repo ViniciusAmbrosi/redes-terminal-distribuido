@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Terminal;
@@ -12,6 +13,7 @@ namespace Terminal_Distribuido.Sockets
 
     public class PersistentSocket
     {
+        protected bool PendingIpAddressSynchronization { get; set; }
         protected Socket SocketConnection { get; set; }
         public IPAddress Address { get; protected set; }
         protected PropagateRequestDelegate PropagateRequestDelegate { get; set; }
@@ -23,13 +25,15 @@ namespace Terminal_Distribuido.Sockets
             IPAddress address,
             PropagateRequestDelegate propagateRequestDelegate,
             HandleResponseDelegate handleResponseDelegate,
-            TerminalManager terminalManager)
+            TerminalManager terminalManager,
+            bool pendingIpAddressSynzhronization)
         {
             this.SocketConnection = socketConnection;
             this.Address = address;
             this.PropagateRequestDelegate = propagateRequestDelegate;
             this.HandleResponseDelegate = handleResponseDelegate;
             this.TerminalManager = terminalManager;
+            this.PendingIpAddressSynchronization = pendingIpAddressSynzhronization;
         }
 
         public void HandleIncoming()
@@ -38,6 +42,15 @@ namespace Terminal_Distribuido.Sockets
             {
                 byte[] incomingDataBytes = new byte[1024];
                 int bytesReceived = SocketConnection.Receive(incomingDataBytes);
+
+                if (PendingIpAddressSynchronization)
+                {
+                    string ipAddress = Encoding.ASCII.GetString(incomingDataBytes, 0, bytesReceived);
+                    Address = IPAddress.Parse(ipAddress);
+
+                    this.PendingIpAddressSynchronization = false;
+                    continue;
+                }
 
                 CommandRequestProtocol? originalRequest = 
                     ProtocolConverter.ConvertByteArrayToProtocol(incomingDataBytes, bytesReceived);
