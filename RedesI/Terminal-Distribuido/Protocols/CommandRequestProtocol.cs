@@ -11,32 +11,27 @@ namespace Terminal_Distribuido.Protocols
 
         public string Message { get; set; }
 
-        public bool IsResponse { get; set; }
-
         public CommandRequestProtocol(string originatorAddress, string targetAddress, string message, bool isResponse) :
-            base(RequestType.Command)
+            base(RequestType.Command, isResponse)
         {
             OriginatorAddress = originatorAddress;
             AddressStack = new Stack<string>();
             Message = message;
-            IsResponse = isResponse;
 
             AddressStack.Push(targetAddress);
         }
-
         
         public CommandRequestProtocol(string originatorAddress, string replierAddress, Stack<string> targets, string message, bool isResponse) :
-            base(RequestType.Command)
+            base(RequestType.Command, isResponse)
         {
             OriginatorAddress = originatorAddress;
             ReplierAddress = replierAddress;
             AddressStack = targets;
             Message = message;
-            IsResponse = isResponse;
         }
 
         public CommandRequestProtocol() :
-            base(RequestType.Command)
+            base(RequestType.Command, false)
         {
         }
     }

@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using Terminal_Distribuido.Manager;
 using Terminal_Distribuido.Terminal;
 
 namespace Terminal_Distribuido.Sockets
@@ -9,17 +10,9 @@ namespace Terminal_Distribuido.Sockets
         public OutgoingPersistentSocket(
             Socket socketConnection,
             IPAddress address,
-            PropagateRequestDelegate callbackDelegate,
-            HandleResponseDelegate handleResponseDelegate,
-            TerminalManager terminalManager) : 
-            base(socketConnection, address, callbackDelegate, handleResponseDelegate, terminalManager)
+            RequestManager requestManager) : 
+            base(socketConnection, address, requestManager)
         {
-        }
-
-        public void CreateMonitoringThread()
-        {
-            Thread incomingSocketThread = new Thread(HandleIncoming);
-            incomingSocketThread.Start();
         }
     }
 }

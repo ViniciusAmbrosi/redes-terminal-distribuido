@@ -6,7 +6,7 @@ namespace Terminal_Distribuido.Protocols
         public string RealIpAddress { get; set; }
 
         public NetworkSynzhronizationRequestProtocol(string realIpAddress) :
-            base(RequestType.AddressSynchronization)
+            base(RequestType.AddressSynchronization, false)
         {
             RealIpAddress = realIpAddress;
         }
