@@ -1,12 +1,11 @@
 ﻿using Newtonsoft.Json.Linq;
 using System.Text;
-using Terminal_Distribuido.Protocols;
 
 namespace Terminal_Distribuido.Converters
 {
-    public static class ProtocolConverter
+    public static class ProtocolConverter <T> 
     {
-        public static byte[] ConvertPayloadToByteArray(CommandRequestProtocol protocolObject)
+        public static byte[] ConvertPayloadToByteArray(T protocolObject)
         {
             if (protocolObject == null)
             {
@@ -20,12 +19,12 @@ namespace Terminal_Distribuido.Converters
             return payloadBytes;
         }
 
-        public static CommandRequestProtocol? ConvertByteArrayToProtocol(byte[] byteArray, int bytesReceived)
+        public static T? ConvertByteArrayToProtocol(byte[] byteArray, int bytesReceived)
         {
             if (byteArray == null)
             {
                 Console.WriteLine("Byte array was null");
-                return null;
+                return default(T);
             }
 
             string payload = Encoding.ASCII.GetString(byteArray, 0, bytesReceived);
@@ -33,10 +32,10 @@ namespace Terminal_Distribuido.Converters
             if (string.IsNullOrEmpty(payload))
             {
                 Console.WriteLine("Byte array constains empty payload");
-                return null;
+                return default(T);
             }
 
-            CommandRequestProtocol? protocolObject = JToken.Parse(payload).ToObject<CommandRequestProtocol>();
+            T? protocolObject = JToken.Parse(payload).ToObject<T>();
 
             return protocolObject;
         }

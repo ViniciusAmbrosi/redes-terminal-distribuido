@@ -11,9 +11,8 @@ namespace Terminal_Distribuido.Sockets
             IPAddress address,
             PropagateRequestDelegate callbackDelegate,
             HandleResponseDelegate handleResponseDelegate,
-            TerminalManager terminalManager,
-            bool pendingIpAddressSynzhronization) : 
-            base(socketConnection, address, callbackDelegate, handleResponseDelegate, terminalManager, pendingIpAddressSynzhronization)
+            TerminalManager terminalManager) : 
+            base(socketConnection, address, callbackDelegate, handleResponseDelegate, terminalManager)
         {
         }
 

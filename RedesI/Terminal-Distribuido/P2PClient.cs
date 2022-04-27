@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
@@ -95,8 +94,7 @@ public class P2PClient
                     ipAddress, 
                     PropagateIncomingSocketMessageDelegate, 
                     HandleResponseDelegate, 
-                    TerminalManager,
-                    true);
+                    TerminalManager);
 
                 persistent.CreateMonitoringThread();
                 OutgoingPeer = persistent;
@@ -155,13 +153,15 @@ public class P2PClient
                     ClientIpAddress,
                     PropagateIncomingSocketMessageDelegate,
                     HandleResponseDelegate,
-                    TerminalManager,
-                    false);
+                    TerminalManager);
 
                 persistentSocket.CreateMonitoringThread();
                 IncomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
 
-                socket.Send(Encoding.ASCII.GetBytes(ClientIpAddress.ToString()));
+                NetworkSynzhronizationRequestProtocol networkSynzhronizationRequest 
+                    = new NetworkSynzhronizationRequestProtocol(ClientIpAddress.ToString());
+
+                socket.Send(ProtocolConverter<NetworkSynzhronizationRequestProtocol>.ConvertPayloadToByteArray(networkSynzhronizationRequest));
             }
 
             socket.Shutdown(SocketShutdown.Both);
@@ -188,7 +188,7 @@ public class P2PClient
                 CommandRequestProtocol commandRequest = 
                     new CommandRequestProtocol(ClientIpAddress.ToString(), clientEntry.Value.Address.ToString(), command, false);
 
-                clientEntry.Value.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(commandRequest));
+                clientEntry.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
             }
 
             if (OutgoingPeer != null)
@@ -196,7 +196,7 @@ public class P2PClient
                 CommandRequestProtocol commandRequest = 
                     new CommandRequestProtocol(ClientIpAddress.ToString(), OutgoingPeer.Address.ToString(), command, false);
 
-                OutgoingPeer.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(commandRequest));
+                OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
             }
         }
         finally
@@ -218,7 +218,7 @@ public class P2PClient
                 outgoingPeerAddress != null &&
                 outgoingPeerAddress.Equals(targetAddress.ToString()))
             {
-                OutgoingPeer.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(response));
+                OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(response));
                 return;
             }
 
@@ -228,7 +228,7 @@ public class P2PClient
 
                 if (incomingPeerAddress.Equals(targetAddress.ToString()))
                 {
-                    incomingPeer.Value.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(response));
+                    incomingPeer.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(response));
                     return;
                 }
             }
@@ -248,24 +248,20 @@ public class P2PClient
             foreach (var incomingPeer in IncomingPeers)
             {
                 string? incomingPeerAddress = incomingPeer.Value.Address.ToString();
+
                 if (!incomingPeerAddress.Equals(address.ToString()))
                 {
                     incomingPeer.Value.SendMessage(message);
                 }
-                else
-                {
-                    Console.WriteLine("Skipping Loop. From {0} | To {1}", address.ToString(), incomingPeerAddress);
-                }
             }
 
             string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
-            if (OutgoingPeer != null && outgoingPeerAddress != null && !outgoingPeerAddress.Equals(address.ToString()))
+
+            if (OutgoingPeer != null &&
+                outgoingPeerAddress != null &&
+                !outgoingPeerAddress.Equals(address.ToString()))
             {
                 OutgoingPeer.SendMessage(message);
-            }
-            else 
-            {
-                Console.WriteLine("Skipping Loop. From {0} | To {1}", address.ToString(), outgoingPeerAddress);
             }
         }
         finally

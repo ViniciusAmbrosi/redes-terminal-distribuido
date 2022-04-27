@@ -1,11 +1,11 @@
 ﻿
 namespace Terminal_Distribuido.Protocols
 {
-    public class CommandRequestProtocol
+    public class CommandRequestProtocol : RequestProtocol
     {
         public string OriginatorAddress { get; set; }
 
-        public string ReplierAddress { get; set; }
+        public string? ReplierAddress { get; set; }
 
         public Stack<string> AddressStack { get; set; }
 
@@ -13,8 +13,8 @@ namespace Terminal_Distribuido.Protocols
 
         public bool IsResponse { get; set; }
 
-
-        public CommandRequestProtocol(string originatorAddress, string targetAddress, string message, bool isResponse)
+        public CommandRequestProtocol(string originatorAddress, string targetAddress, string message, bool isResponse) :
+            base(RequestType.Command)
         {
             OriginatorAddress = originatorAddress;
             AddressStack = new Stack<string>();
@@ -25,7 +25,8 @@ namespace Terminal_Distribuido.Protocols
         }
 
         
-        public CommandRequestProtocol(string originatorAddress, string replierAddress, Stack<string> targets, string message, bool isResponse)
+        public CommandRequestProtocol(string originatorAddress, string replierAddress, Stack<string> targets, string message, bool isResponse) :
+            base(RequestType.Command)
         {
             OriginatorAddress = originatorAddress;
             ReplierAddress = replierAddress;
@@ -34,7 +35,8 @@ namespace Terminal_Distribuido.Protocols
             IsResponse = isResponse;
         }
 
-        public CommandRequestProtocol()
+        public CommandRequestProtocol() :
+            base(RequestType.Command)
         {
         }
     }

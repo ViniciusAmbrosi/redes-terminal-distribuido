@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Terminal;
@@ -13,7 +12,6 @@ namespace Terminal_Distribuido.Sockets
 
     public class PersistentSocket
     {
-        protected bool PendingIpAddressSynchronization { get; set; }
         protected Socket SocketConnection { get; set; }
         public IPAddress Address { get; protected set; }
         protected PropagateRequestDelegate PropagateRequestDelegate { get; set; }
@@ -25,38 +23,37 @@ namespace Terminal_Distribuido.Sockets
             IPAddress address,
             PropagateRequestDelegate propagateRequestDelegate,
             HandleResponseDelegate handleResponseDelegate,
-            TerminalManager terminalManager,
-            bool pendingIpAddressSynzhronization)
+            TerminalManager terminalManager)
         {
             this.SocketConnection = socketConnection;
             this.Address = address;
             this.PropagateRequestDelegate = propagateRequestDelegate;
             this.HandleResponseDelegate = handleResponseDelegate;
             this.TerminalManager = terminalManager;
-            this.PendingIpAddressSynchronization = pendingIpAddressSynzhronization;
         }
 
         public void HandleIncoming()
         {
             while (true)
             {
-                byte[] incomingDataBytes = new byte[1024];
+                byte[] incomingDataBytes = new byte[10240];
                 int bytesReceived = SocketConnection.Receive(incomingDataBytes);
 
-                if (PendingIpAddressSynchronization)
-                {
-                    string ipAddress = Encoding.ASCII.GetString(incomingDataBytes, 0, bytesReceived);
-                    Address = IPAddress.Parse(ipAddress);
+                RequestProtocol? genericResponse =
+                    ProtocolConverter<RequestProtocol>.ConvertByteArrayToProtocol(incomingDataBytes, bytesReceived);
 
-                    this.PendingIpAddressSynchronization = false;
+                if (genericResponse.RequestType == RequestType.AddressSynchronization)
+                {
+                    NetworkSynzhronizationRequestProtocol? networkSynchronizationRequest =
+                        ProtocolConverter<NetworkSynzhronizationRequestProtocol>.ConvertByteArrayToProtocol(incomingDataBytes, bytesReceived);
+
+                    Address = IPAddress.Parse(networkSynchronizationRequest.RealIpAddress);
+
                     continue;
                 }
 
                 CommandRequestProtocol? originalRequest = 
-                    ProtocolConverter.ConvertByteArrayToProtocol(incomingDataBytes, bytesReceived);
-
-                if (originalRequest == null)
-                    continue;
+                    ProtocolConverter<CommandRequestProtocol>.ConvertByteArrayToProtocol(incomingDataBytes, bytesReceived);
 
                 if (originalRequest.IsResponse)
                 {
@@ -84,7 +81,7 @@ namespace Terminal_Distribuido.Sockets
     
                     //continue to propagate request
                     originalRequest.AddressStack.Push(Address.ToString());
-                    PropagateRequestDelegate(ProtocolConverter.ConvertPayloadToByteArray(originalRequest), Address);
+                    PropagateRequestDelegate(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(originalRequest), Address);
                 }
             }
         }
