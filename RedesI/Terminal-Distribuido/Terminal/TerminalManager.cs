@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using System.Text;
+using System.Runtime.InteropServices;
 
 namespace Terminal_Distribuido.Terminal
 {
@@ -10,8 +10,11 @@ namespace Terminal_Distribuido.Terminal
         public TerminalManager()
         {
             this.Process = new System.Diagnostics.Process();
-            this.Process.StartInfo.FileName = "/bin/bash";
-            //this.Process.StartInfo.FileName = "cmd.exe";
+
+            ApplyOperatingSystemDependantAction(
+                () => SetExecutable("cmd.exe"),
+                () => SetExecutable("/bin/bash"));
+
             this.Process.StartInfo.RedirectStandardOutput = true;
             this.Process.StartInfo.RedirectStandardInput = true;
             this.Process.StartInfo.RedirectStandardError = true;
@@ -21,8 +24,10 @@ namespace Terminal_Distribuido.Terminal
 
         public string ExecuteCommand(string command)
         {
-            this.Process.StartInfo.Arguments = "-c " + "\"" + command + "\"";
-            //this.Process.StartInfo.Arguments = "/C " + command ;
+            ApplyOperatingSystemDependantAction( 
+                () => SetArguments("/C ", command),
+                () => SetArguments("-c ", "\"" + command + "\""));
+
             this.Process.Start();
 
             string response = this.Process.StandardOutput.ReadToEnd();
@@ -30,6 +35,27 @@ namespace Terminal_Distribuido.Terminal
             this.Process.Close();
 
             return response;
+        }
+
+        private void ApplyOperatingSystemDependantAction(Action windowsAction, Action linuxAction)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                windowsAction();
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                linuxAction();
+            }
+        }
+
+        private void SetExecutable(string executablePath)
+        {
+            this.Process.StartInfo.FileName = executablePath;
+        }
+
+        private void SetArguments(string argumentPrefix, string argument) {
+            this.Process.StartInfo.Arguments = argumentPrefix + argument;
         }
     }
 }

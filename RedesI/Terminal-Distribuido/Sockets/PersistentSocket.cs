@@ -1,31 +1,34 @@
-﻿using Newtonsoft.Json.Linq;
-using System.Diagnostics;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
-using System.Text;
+using Terminal_Distribuido.Converters;
+using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Terminal;
-using static P2PClient;
 
 namespace Terminal_Distribuido.Sockets
 {
-    public delegate void PropagateDelegate(byte[] message, IPAddress address);
+    public delegate void PropagateRequestDelegate(byte[] message, IPAddress address);
+
+    public delegate void HandleResponseDelegate(CommandRequestProtocol response);
 
     public class PersistentSocket
     {
         protected Socket SocketConnection { get; set; }
         public IPAddress Address { get; protected set; }
-        protected PropagateDelegate CallbackDelegate { get; set; }
+        protected PropagateRequestDelegate PropagateRequestDelegate { get; set; }
+        protected HandleResponseDelegate HandleResponseDelegate { get; set; }
         protected TerminalManager TerminalManager { get; set; }
 
         public PersistentSocket(
             Socket socketConnection,
             IPAddress address,
-            PropagateDelegate callbackDelegate,
+            PropagateRequestDelegate propagateRequestDelegate,
+            HandleResponseDelegate handleResponseDelegate,
             TerminalManager terminalManager)
         {
             this.SocketConnection = socketConnection;
             this.Address = address;
-            this.CallbackDelegate = callbackDelegate;
+            this.PropagateRequestDelegate = propagateRequestDelegate;
+            this.HandleResponseDelegate = handleResponseDelegate;
             this.TerminalManager = terminalManager;
         }
 
@@ -33,24 +36,43 @@ namespace Terminal_Distribuido.Sockets
         {
             while (true)
             {
-                string incomingDataFromSocket = "";
                 byte[] incomingDataBytes = new byte[1024];
-
                 int bytesReceived = SocketConnection.Receive(incomingDataBytes);
-                incomingDataFromSocket += Encoding.ASCII.GetString(incomingDataBytes, 0, bytesReceived);
 
-                Hello hello = JToken.Parse(incomingDataFromSocket).ToObject<Hello>();
+                CommandRequestProtocol? originalRequest = 
+                    ProtocolConverter.ConvertByteArrayToProtocol(incomingDataBytes, bytesReceived);
 
-                string response = TerminalManager.ExecuteCommand(incomingDataFromSocket);
-                Console.WriteLine("Triggering remote command execution triggered by {0}", Address.ToString());
-                Console.WriteLine(response);
+                if (originalRequest == null)
+                    continue;
 
-                byte[] msg = Encoding.ASCII.GetBytes(incomingDataFromSocket);
+                if (originalRequest.IsResponse)
+                {
+                    if (originalRequest.AddressStack.Count == 0)
+                    {
+                        Console.WriteLine("Response received from {0}");
+                        Console.WriteLine(originalRequest.Message);
+                    }
+                    else 
+                    {
+                        HandleResponseDelegate(originalRequest);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Triggering remote command execution triggered by {0}", Address.ToString());
 
-                Console.WriteLine("Command received from {0} -> {1}", Address.ToString(), incomingDataFromSocket);
+                    string response = TerminalManager.ExecuteCommand(originalRequest.Message);
+                    Console.WriteLine(response);
 
-                //fire event about message received
-                CallbackDelegate(msg, Address);
+                    //respond to caller
+                    CommandRequestProtocol responseRequest =
+                        new CommandRequestProtocol(originalRequest.OriginatorAddress, Address.ToString(), new Stack<string>(originalRequest.AddressStack), response, true);
+                    HandleResponseDelegate(responseRequest);
+    
+                    //continue to propagate request
+                    originalRequest.AddressStack.Push(Address.ToString());
+                    PropagateRequestDelegate(ProtocolConverter.ConvertPayloadToByteArray(originalRequest), Address);
+                }
             }
         }
 

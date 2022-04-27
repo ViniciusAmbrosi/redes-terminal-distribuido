@@ -1,52 +1,50 @@
-﻿using Newtonsoft.Json.Linq;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
+using Terminal_Distribuido.Converters;
+using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
 using Terminal_Distribuido.Terminal;
 
 public class P2PClient
 {
-    public static OutgoingPersistentSocket? outgoingPeer;
-    public static ConcurrentDictionary<string, IncomingPersistentSocket> incomingPeers = new ConcurrentDictionary<string, IncomingPersistentSocket>();
-
-    private static SemaphoreSlim Semaphore = new SemaphoreSlim(1);
-
-    private static TerminalManager terminalManager = new TerminalManager();
-
-    public class Hello {
-        public Hello(string command, bool isRequest, bool isResponse)
-        {
-            this.command = command;
-            this.isRequest = isRequest;
-            this.isResponse = isResponse;
-        }
-
-        public string command { get; set; } 
-        public bool isRequest { get; set; }
-        public bool isResponse { get; set; }
-    }
+    private static SemaphoreSlim Semaphore { get; set; }
+    private static TerminalManager TerminalManager { get; set; }
+    public static OutgoingPersistentSocket? OutgoingPeer { get; set; }
+    public static ConcurrentDictionary<string, IncomingPersistentSocket> IncomingPeers { get; set; }
+    public static IPAddress ClientIpAddress { get; private set; }
 
     public static int Main(String[] args)
     {
+        InitializeP2PClient();
+
         InitiateOutgoingSocketConnection();
         ListenForIncomingSocketConnections();
 
         while (true)
         {
             string? message = Console.ReadLine();
-            Hello hello = new Hello(message, true, false);
-            
-            byte[] msg = Encoding.ASCII.GetBytes(JToken.FromObject(hello).ToString());
 
-            string commandResult = terminalManager.ExecuteCommand(message);
+            if (String.IsNullOrEmpty(message)) { 
+                continue;
+            }
+            string commandResult = TerminalManager.ExecuteCommand(message);
+
+
             Console.WriteLine("Source system result");
             Console.WriteLine($"{commandResult}\n");
 
             // Propagate data to all sockets
-            PropagateOutgoingMessage(msg);
+            PropagateOutgoingMessage(message);
         }
+    }
+
+    private static void InitializeP2PClient() 
+    {
+        ClientIpAddress = Dns.GetHostEntry(Dns.GetHostName()).AddressList[0];
+        TerminalManager = new TerminalManager();
+        Semaphore = new SemaphoreSlim(1);
+        IncomingPeers = new ConcurrentDictionary<string, IncomingPersistentSocket>();
     }
 
     public static void InitiateOutgoingSocketConnection()
@@ -91,10 +89,15 @@ public class P2PClient
 
                 Console.WriteLine("Socket connected to {0}", sender?.RemoteEndPoint?.ToString());
 
-                OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(sender, ipAddress, PropagateIncomingSocketMessageDelegate, terminalManager);
+                OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(
+                    sender, 
+                    ipAddress, 
+                    PropagateIncomingSocketMessageDelegate, 
+                    HandleResponseDelegate, 
+                    TerminalManager);
 
                 persistent.CreateMonitoringThread();
-                outgoingPeer = persistent;
+                OutgoingPeer = persistent;
             }
             catch (ArgumentNullException ane)
             {
@@ -124,14 +127,12 @@ public class P2PClient
             return;
         }
 
-        IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
-        IPAddress ipAddress = host.AddressList[0];
-        IPEndPoint localEndPoint = new IPEndPoint(ipAddress, port);
+        IPEndPoint localEndPoint = new IPEndPoint(ClientIpAddress, port);
 
         try
         {
             // Create a Socket that will use Tcp protocol
-            Socket listener = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            Socket listener = new Socket(ClientIpAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             // A Socket must be associated with an endpoint using the Bind method
 
             listener.Bind(localEndPoint);
@@ -151,10 +152,11 @@ public class P2PClient
                     socket,
                     sourceIp,
                     PropagateIncomingSocketMessageDelegate,
-                    terminalManager);
+                    HandleResponseDelegate,
+                    TerminalManager);
 
                 persistentSocket.CreateMonitoringThread();
-                incomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
+                IncomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
             }
 
             socket.Shutdown(SocketShutdown.Both);
@@ -170,21 +172,60 @@ public class P2PClient
     }
 
     // Create a method for a delegate.
-    public static void PropagateOutgoingMessage(byte[] message)
+    public static void PropagateOutgoingMessage(string command)
     {
         try
         {
             Semaphore.Wait();
 
-            foreach (var clientEntry in incomingPeers)
+            foreach (var clientEntry in IncomingPeers)
             {
-                PersistentSocket targetSocket = clientEntry.Value;
-                targetSocket.SendMessage(message);
+                CommandRequestProtocol commandRequest = 
+                    new CommandRequestProtocol(ClientIpAddress.ToString(), clientEntry.Value.Address.ToString(), command, false);
+
+                clientEntry.Value.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(commandRequest));
             }
 
-            if (outgoingPeer != null)
+            if (OutgoingPeer != null)
             {
-                outgoingPeer.SendMessage(message);
+                CommandRequestProtocol commandRequest = 
+                    new CommandRequestProtocol(ClientIpAddress.ToString(), OutgoingPeer.Address.ToString(), command, false);
+
+                OutgoingPeer.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(commandRequest));
+            }
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
+    }
+
+    public static void HandleResponseDelegate(CommandRequestProtocol response)
+    {
+        try
+        {
+            Semaphore.Wait();
+
+            string targetAddress = response.AddressStack.Pop();
+            string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
+
+            if (OutgoingPeer != null &&
+                outgoingPeerAddress != null &&
+                outgoingPeerAddress.Equals(targetAddress.ToString()))
+            {
+                OutgoingPeer.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(response));
+                return;
+            }
+
+            foreach (var incomingPeer in IncomingPeers)
+            {
+                string? incomingPeerAddress = incomingPeer.Value.Address.ToString();
+
+                if (incomingPeerAddress.Equals(targetAddress.ToString()))
+                {
+                    incomingPeer.Value.SendMessage(ProtocolConverter.ConvertPayloadToByteArray(response));
+                    return;
+                }
             }
         }
         finally
@@ -199,7 +240,7 @@ public class P2PClient
         {
             Semaphore.Wait();
 
-            foreach (var incomingPeer in incomingPeers)
+            foreach (var incomingPeer in IncomingPeers)
             {
                 string? incomingPeerAddress = incomingPeer.Value.Address.ToString();
                 if (!incomingPeerAddress.Equals(address.ToString()))
@@ -212,10 +253,10 @@ public class P2PClient
                 }
             }
 
-            string? outgoingPeerAddress = outgoingPeer?.Address?.ToString();
-            if (outgoingPeer != null && outgoingPeerAddress != null && !outgoingPeerAddress.Equals(address.ToString()))
+            string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
+            if (OutgoingPeer != null && outgoingPeerAddress != null && !outgoingPeerAddress.Equals(address.ToString()))
             {
-                outgoingPeer.SendMessage(message);
+                OutgoingPeer.SendMessage(message);
             }
             else 
             {

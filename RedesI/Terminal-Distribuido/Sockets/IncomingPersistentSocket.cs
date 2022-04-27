@@ -9,9 +9,10 @@ namespace Terminal_Distribuido.Sockets
         public IncomingPersistentSocket(
             Socket socketConnection,
             IPAddress address,
-            PropagateDelegate callbackDelegate,
+            PropagateRequestDelegate callbackDelegate,
+            HandleResponseDelegate handleResponseDelegate,
             TerminalManager terminalManager) : 
-            base(socketConnection, address, callbackDelegate, terminalManager)
+            base(socketConnection, address, callbackDelegate, handleResponseDelegate, terminalManager)
         {
         }
 
