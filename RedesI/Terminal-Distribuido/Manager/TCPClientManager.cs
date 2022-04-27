@@ -7,76 +7,19 @@ using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
 using Terminal_Distribuido.Terminal;
 
-public class TCPClientManager
+public class TCPClientManager : BaseClientManager
 {
-    private TerminalManager TerminalManager { get; set; }
     private OutgoingPersistentSocket? OutgoingPeer { get; set; }
     private ConcurrentDictionary<string, IncomingPersistentSocket> IncomingPeers { get; set; }
-    private IPAddress ClientIpAddress { get; set; }
-    private RequestManager RequestManager { get; set; }
 
-    public TCPClientManager()
+    public TCPClientManager() :
+        base()
     {
-        this.TerminalManager = new TerminalManager();
-
         this.IncomingPeers = new ConcurrentDictionary<string, IncomingPersistentSocket>();
-        
-        this.ClientIpAddress = Dns.GetHostEntry(Dns.GetHostName()).AddressList[0];
-
-        this.RequestManager = new RequestManager(HandleResponseDelegate, PropagateToKnownPeersWithoutLoop, TerminalManager);
     }
 
-    public void ManageTerminalInput() {
-        while (true)
-        {
-            string? message = Console.ReadLine();
-
-            if (!String.IsNullOrEmpty(message))
-            {
-                string commandResult = TerminalManager.ExecuteCommand(message);
-
-                Console.WriteLine("\n-- -- -- -- -- -- -- -- -- -- -- -- --");
-                Console.WriteLine("\nSource system result");
-                Console.WriteLine($"{commandResult}\n");
-
-                // Propagate data to all sockets
-                PropagateCommandToAllPeers(message);
-            }
-        }
-    }
-
-    public void InitiateOutgoingSocketConnection()
+    public override void StartClient(string targetEnvironment, int port)
     {
-        Console.WriteLine("Provide target environment IP address");
-        string? targetEnvironment = Console.ReadLine();
-
-        Console.WriteLine("Provide target environment port");
-        string? targetPort = Console.ReadLine();
-
-        StartClient(targetEnvironment, targetPort);
-    }
-
-    public void ListenForIncomingSocketConnections()
-    {
-        Console.WriteLine("Provide this server port for socket server");
-        string? serverPort = Console.ReadLine();
-
-        Thread maintainedSocketThread = new Thread(() => StartServer(serverPort));
-        maintainedSocketThread.Start();
-    }
-
-    public void StartClient(string? targetEnvironment, string? targetPort)
-    {
-        int port = 0;
-
-        if (String.IsNullOrEmpty(targetEnvironment) || 
-            String.IsNullOrEmpty(targetPort) || 
-            !int.TryParse(targetPort, out port)) 
-        {
-            Console.WriteLine("No target IP or port provided, continuing as client only.");
-            return;
-        }
-
         try
         {
             IPAddress ipAddress = IPAddress.Parse(targetEnvironment);
@@ -104,15 +47,8 @@ public class TCPClientManager
         }
     }
 
-    public void StartServer(string? serverPort)
+    public override void StartServer(int port)
     {
-        int port = 0;
-        if (String.IsNullOrEmpty(serverPort) || !int.TryParse(serverPort, out port))
-        {
-            Console.WriteLine("Server port not provided. Interrupting flow.");
-            return;
-        }
-
         IPEndPoint localEndPoint = new IPEndPoint(ClientIpAddress, port);
 
         try
@@ -152,7 +88,7 @@ public class TCPClientManager
         }
     }
 
-    public void PropagateCommandToAllPeers(string command)
+    public override void PropagateCommandToAllPeers(string command)
     {
         foreach (var clientEntry in IncomingPeers)
         {
@@ -171,7 +107,7 @@ public class TCPClientManager
         }
     }
 
-    public void HandleResponseDelegate(CommandRequestProtocol response)
+    public override void HandleResponseDelegate(CommandRequestProtocol response)
     {
         string targetAddress = response.AddressStack.Count == 0 ? response.OriginatorAddress : response.AddressStack.Pop();
         string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
@@ -203,7 +139,7 @@ public class TCPClientManager
         }
     }
 
-    public void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address)
+    public override void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address)
     {
         string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
 
