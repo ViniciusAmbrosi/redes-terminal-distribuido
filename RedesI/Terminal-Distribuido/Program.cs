@@ -3,11 +3,11 @@ public class Program
 {
     public static void Main(String[] args)
     {
-        ClientManager p2PClient = new ClientManager();
+        ClientManager p2pClient = new ClientManager();
 
-        p2PClient.InitiateOutgoingSocketConnection();
-        p2PClient.ListenForIncomingSocketConnections();
+        p2pClient.InitiateOutgoingSocketConnection();
+        p2pClient.ListenForIncomingSocketConnections();
 
-        p2PClient.ManageTerminalInput();
+        p2pClient.ManageTerminalInput();
     }
 }
