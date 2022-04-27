@@ -7,7 +7,7 @@ using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
 using Terminal_Distribuido.Terminal;
 
-public class ClientManager
+public class TCPClientManager
 {
     private TerminalManager TerminalManager { get; set; }
     private OutgoingPersistentSocket? OutgoingPeer { get; set; }
@@ -15,7 +15,7 @@ public class ClientManager
     private IPAddress ClientIpAddress { get; set; }
     private RequestManager RequestManager { get; set; }
 
-    public ClientManager()
+    public TCPClientManager()
     {
         this.TerminalManager = new TerminalManager();
 
@@ -120,7 +120,7 @@ public class ClientManager
             Socket listener = new Socket(ClientIpAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
             listener.Bind(localEndPoint);
-            listener.Listen(10);
+            listener.Listen(1);
 
             Console.WriteLine("Started listening for requests");
             Socket socket;
@@ -134,7 +134,7 @@ public class ClientManager
 
                 IncomingPersistentSocket persistentSocket  = new IncomingPersistentSocket(
                     socket,
-                    ClientIpAddress,
+                    sourceIp,
                     RequestManager);
 
                 persistentSocket.CreateMonitoringThread();
@@ -157,7 +157,7 @@ public class ClientManager
         foreach (var clientEntry in IncomingPeers)
         {
             CommandRequestProtocol commandRequest = 
-                new CommandRequestProtocol(ClientIpAddress.ToString(), clientEntry.Value.Address.ToString(), command, false);
+                new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
 
             clientEntry.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
         }
@@ -165,7 +165,7 @@ public class ClientManager
         if (OutgoingPeer != null)
         {
             CommandRequestProtocol commandRequest = 
-                new CommandRequestProtocol(ClientIpAddress.ToString(), OutgoingPeer.Address.ToString(), command, false);
+                new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
 
             OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
         }
@@ -173,13 +173,17 @@ public class ClientManager
 
     public void HandleResponseDelegate(CommandRequestProtocol response)
     {
-        string targetAddress = response.AddressStack.Pop();
+        string targetAddress = response.AddressStack.Count == 0 ? response.OriginatorAddress : response.AddressStack.Pop();
         string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
+
+        Console.WriteLine("trying to respond to {0}", targetAddress);
+        Console.WriteLine("checking against parent {0}", outgoingPeerAddress);
 
         if (OutgoingPeer != null &&
             outgoingPeerAddress != null &&
             outgoingPeerAddress.Equals(targetAddress.ToString()))
         {
+            Console.WriteLine("Sending response request to {0}", outgoingPeerAddress);
             OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(response));
             return;
         }
@@ -188,8 +192,11 @@ public class ClientManager
         {
             string? incomingPeerAddress = incomingPeer.Value.Address.ToString();
 
+            Console.WriteLine("checking against child {0}", incomingPeerAddress);
+
             if (incomingPeerAddress.Equals(targetAddress.ToString()))
             {
+                Console.WriteLine("Sending response request to {0}", incomingPeerAddress);
                 incomingPeer.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(response));
                 return;
             }
@@ -212,8 +219,9 @@ public class ClientManager
                     request.Message, 
                     false);
 
-            commandRequest.AddressStack.Push(outgoingPeerAddress);
+            commandRequest.AddressStack.Push(ClientIpAddress.ToString());
 
+            Console.WriteLine("Sending propagate request to {0}", outgoingPeerAddress);
             OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
         }
 
@@ -231,8 +239,9 @@ public class ClientManager
                         request.Message,
                         false);
 
-                commandRequest.AddressStack.Push(incomingPeerAddress);
+                commandRequest.AddressStack.Push(ClientIpAddress.ToString());
 
+                Console.WriteLine("Sending propagate request to {0}", incomingPeerAddress);
                 incomingPeer.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
             }
         }

@@ -27,6 +27,7 @@ namespace Terminal_Distribuido.Sockets
 
         public void HandleIncoming()
         {
+            //pending split of merged TCP packets received
             while (true)
             {
                 byte[] incomingData = new byte[10240];

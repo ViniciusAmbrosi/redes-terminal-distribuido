@@ -3,7 +3,7 @@ public class Program
 {
     public static void Main(String[] args)
     {
-        ClientManager p2pClient = new ClientManager();
+        TCPClientManager p2pClient = new TCPClientManager();
 
         p2pClient.InitiateOutgoingSocketConnection();
         p2pClient.ListenForIncomingSocketConnections();

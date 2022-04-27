@@ -1,4 +1,5 @@
 ﻿
+using System.Text;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
@@ -9,6 +10,7 @@ namespace Terminal_Distribuido.Manager
 {
     public class RequestManager
     {
+        private SemaphoreSlim Semaphore = new SemaphoreSlim(1);
         private List<IRequestHandlingStrategy> requestHandlingStrategies { get; set; }
 
         public RequestManager(HandleResponseDelegate handleResponseDelegate, PropagateRequestDelegate propagateRequestDelegate, TerminalManager terminalManager)
@@ -22,6 +24,11 @@ namespace Terminal_Distribuido.Manager
 
         public void HandleRequest(byte[] incomingData, int incomingDataByteCount, PersistentSocket persistentSocket)
         {
+            Semaphore.Wait();
+
+            string payload = Encoding.ASCII.GetString(incomingData, 0, incomingDataByteCount);
+            Console.WriteLine("Recived a request with payload as: \n {0}", payload);
+
             RequestProtocol? genericResponse =
                     ProtocolConverter<RequestProtocol>.ConvertByteArrayToProtocol(incomingData, incomingDataByteCount);
 
@@ -38,6 +45,8 @@ namespace Terminal_Distribuido.Manager
                     strategy.HandleRequest(incomingData, incomingDataByteCount, persistentSocket);
                 }
             }
+
+            Semaphore.Release();
         }
     }
 }

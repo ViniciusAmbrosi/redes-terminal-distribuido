@@ -1,4 +1,5 @@
 ﻿
+using System.Net;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
@@ -28,10 +29,10 @@ namespace Terminal_Distribuido.Strategies
 
         public void HandleRequest(byte[] incomingData, int incomingDataByteCount, PersistentSocket persistentSocket)
         {
-            CommandRequestProtocol? commandRequeustProtocol =
+            CommandRequestProtocol? commandRequestProtocol =
                     ProtocolConverter<CommandRequestProtocol>.ConvertByteArrayToProtocol(incomingData, incomingDataByteCount);
 
-            if (commandRequeustProtocol == null)
+            if (commandRequestProtocol == null)
             {
                 Console.WriteLine("Can't process command request procol");
             }
@@ -39,24 +40,24 @@ namespace Terminal_Distribuido.Strategies
             {
                 Console.WriteLine("\n-- -- -- -- -- -- -- -- -- -- -- -- --");
                 Console.WriteLine("\nTriggering remote command [{0}] execution triggered by [{1}]", 
-                    commandRequeustProtocol.Message,
-                    commandRequeustProtocol.OriginatorAddress);
+                    commandRequestProtocol.Message,
+                    commandRequestProtocol.OriginatorAddress);
 
-                string response = TerminalManager.ExecuteCommand(commandRequeustProtocol.Message);
+                string response = TerminalManager.ExecuteCommand(commandRequestProtocol.Message);
                 Console.WriteLine(response);
 
                 //respond to caller
                 CommandRequestProtocol responseRequest =
-                    new CommandRequestProtocol(commandRequeustProtocol.OriginatorAddress, 
-                        persistentSocket.Address.ToString(), 
-                        new Stack<string>(commandRequeustProtocol.AddressStack), 
+                    new CommandRequestProtocol(commandRequestProtocol.OriginatorAddress,
+                        Dns.GetHostEntry(Dns.GetHostName()).AddressList[0].ToString(), 
+                        new Stack<string>(commandRequestProtocol.AddressStack), 
                         response, 
                         true);
 
                 HandleResponseDelegate(responseRequest);
 
                 //continue to propagate request
-                PropagateRequestDelegate(commandRequeustProtocol, persistentSocket.Address);
+                PropagateRequestDelegate(commandRequestProtocol, persistentSocket.Address);
             }
         }
     }
