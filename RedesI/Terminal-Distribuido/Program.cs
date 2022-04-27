@@ -1,13 +1,22 @@
 ﻿
+using Terminal_Distribuido.Manager;
+
 public class Program
 {
     public static void Main(String[] args)
     {
-        TCPClientManager p2pClient = new TCPClientManager();
+        //TCPClientManager tcpClient = new TCPClientManager();
 
-        p2pClient.InitiateOutgoingSocketConnection();
-        p2pClient.ListenForIncomingSocketConnections();
+        //tcpClient.InitiateOutgoingSocketConnection();
+        //tcpClient.ListenForIncomingSocketConnections();
 
-        p2pClient.ManageTerminalInput();
+        //tcpClient.ManageTerminalInput();
+
+        UDPClientManager udpClient = new UDPClientManager();
+
+        udpClient.InitiateOutgoingSocketConnection();
+        udpClient.ListenForIncomingSocketConnections();
+
+        udpClient.ManageTerminalInput();
     }
 }
