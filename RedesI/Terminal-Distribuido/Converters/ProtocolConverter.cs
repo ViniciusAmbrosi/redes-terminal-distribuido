@@ -28,7 +28,6 @@ namespace Terminal_Distribuido.Converters
             }
 
             string payload = Encoding.ASCII.GetString(byteArray, 0, bytesReceived);
-            Console.WriteLine(payload);
 
             if (string.IsNullOrEmpty(payload))
             {
