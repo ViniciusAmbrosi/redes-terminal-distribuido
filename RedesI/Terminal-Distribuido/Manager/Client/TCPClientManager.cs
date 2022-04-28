@@ -5,17 +5,12 @@ using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Manager;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
-using Terminal_Distribuido.Terminal;
 
-public class TCPClientManager : BaseClientManager
+public class TCPClientManager : BaseClientManager <KnownPersistentSocketConnection>
 {
-    protected SocketMonitor? OutgoingPeer { get; set; }
-    protected ConcurrentDictionary<string, SocketMonitor> IncomingPeers { get; set; }
-
     public TCPClientManager() :
         base()
     {
-        this.IncomingPeers = new ConcurrentDictionary<string, SocketMonitor>();
     }
 
     public override void StartClient(string targetEnvironment, int port)
@@ -32,13 +27,13 @@ public class TCPClientManager : BaseClientManager
             {
                 Console.WriteLine("Socket connected to {0}", sender.RemoteEndPoint?.ToString());
 
-                SocketMonitor socketMonitor = new SocketMonitor(
+                KnownPersistentSocketConnection socketMonitor = new KnownPersistentSocketConnection(
                     sender,
-                    ipAddress,
+                    remoteEP,
                     RequestManager);
 
                 socketMonitor.CreateMonitoringThread();
-                OutgoingPeer = socketMonitor;
+                KnownParentEndpoint = socketMonitor;
             }
         }
         catch (Exception e)
@@ -58,7 +53,6 @@ public class TCPClientManager : BaseClientManager
             listener.Bind(localEndPoint);
             listener.Listen(1);
 
-            Console.WriteLine("Started listening for requests");
             Socket socket;
 
             while (true)
@@ -68,13 +62,13 @@ public class TCPClientManager : BaseClientManager
                 IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString());
                 Console.WriteLine("\nReceived connection request from {0}", sourceIp.ToString());
 
-                SocketMonitor persistentSocket  = new SocketMonitor(
+                KnownPersistentSocketConnection persistentSocket  = new KnownPersistentSocketConnection(
                     socket,
-                    sourceIp,
+                    (IPEndPoint)socket.RemoteEndPoint,
                     RequestManager);
 
                 persistentSocket.CreateMonitoringThread();
-                IncomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
+                KnownChildEndpoints.Add(persistentSocket);
 
                 ConnectionRequestProtocol networkSynzhronizationRequest 
                     = new ConnectionRequestProtocol(ClientIpAddress.ToString(), true);
@@ -88,98 +82,9 @@ public class TCPClientManager : BaseClientManager
         }
     }
 
-    public override void PropagateCommandToAllPeers(string command)
+    protected override void SendMessage<T>(KnownPersistentSocketConnection endpoint, T request)
     {
-        foreach (var clientEntry in IncomingPeers)
-        {
-            CommandRequestProtocol commandRequest = 
-                new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
-
-            clientEntry.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
-        }
-
-        if (OutgoingPeer != null)
-        {
-            CommandRequestProtocol commandRequest = 
-                new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
-
-            OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
-        }
+        endpoint.SendMessage(ProtocolConverter<T>.ConvertPayloadToByteArray(request));
     }
 
-    public override void HandleResponseDelegate(CommandRequestProtocol response)
-    {
-        string targetAddress = response.AddressStack.Count == 0 ? response.OriginatorAddress : response.AddressStack.Pop();
-        string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
-
-        Console.WriteLine("trying to respond to {0}", targetAddress);
-        Console.WriteLine("checking against parent {0}", outgoingPeerAddress);
-
-        if (OutgoingPeer != null &&
-            outgoingPeerAddress != null &&
-            outgoingPeerAddress.Equals(targetAddress.ToString()))
-        {
-            Console.WriteLine("Sending response request to {0}", outgoingPeerAddress);
-            OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(response));
-            return;
-        }
-
-        foreach (var incomingPeer in IncomingPeers)
-        {
-            string? incomingPeerAddress = incomingPeer.Value.Address.ToString();
-
-            Console.WriteLine("checking against child {0}", incomingPeerAddress);
-
-            if (incomingPeerAddress.Equals(targetAddress.ToString()))
-            {
-                Console.WriteLine("Sending response request to {0}", incomingPeerAddress);
-                incomingPeer.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(response));
-                return;
-            }
-        }
-    }
-
-    public override void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address)
-    {
-        string? outgoingPeerAddress = OutgoingPeer?.Address?.ToString();
-
-        if (OutgoingPeer != null &&
-            outgoingPeerAddress != null &&
-            !outgoingPeerAddress.Equals(address.ToString()))
-        {
-            CommandRequestProtocol commandRequest =
-                new CommandRequestProtocol(
-                    request.OriginatorAddress, 
-                    null,
-                    new Stack<string>(request.AddressStack), 
-                    request.Message, 
-                    false);
-
-            commandRequest.AddressStack.Push(ClientIpAddress.ToString());
-
-            Console.WriteLine("Sending propagate request to {0}", outgoingPeerAddress);
-            OutgoingPeer.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
-        }
-
-        foreach (var incomingPeer in IncomingPeers)
-        {
-            string? incomingPeerAddress = incomingPeer.Value.Address.ToString();
-
-            if (!incomingPeerAddress.Equals(address.ToString()))
-            {
-                CommandRequestProtocol commandRequest =
-                    new CommandRequestProtocol(
-                        request.OriginatorAddress,
-                        null,
-                        new Stack<string>(request.AddressStack),
-                        request.Message,
-                        false);
-
-                commandRequest.AddressStack.Push(ClientIpAddress.ToString());
-
-                Console.WriteLine("Sending propagate request to {0}", incomingPeerAddress);
-                incomingPeer.Value.SendMessage(ProtocolConverter<CommandRequestProtocol>.ConvertPayloadToByteArray(commandRequest));
-            }
-        }
-    }
 }

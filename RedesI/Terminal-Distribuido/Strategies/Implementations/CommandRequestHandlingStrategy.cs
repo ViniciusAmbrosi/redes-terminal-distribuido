@@ -7,7 +7,7 @@ using Terminal_Distribuido.Terminal;
 
 namespace Terminal_Distribuido.Strategies
 {
-    public abstract class BaseCommandRequestHandlingStrategy<T> : IRequestHandlingStrategy <T>
+    public class CommandRequestHandlingStrategy : IRequestHandlingStrategy <KnownConnection>
     {
         protected HandleResponseDelegate HandleResponseDelegate { get; set; }
 
@@ -15,7 +15,7 @@ namespace Terminal_Distribuido.Strategies
 
         protected TerminalManager TerminalManager { get; set; }
 
-        public BaseCommandRequestHandlingStrategy(HandleResponseDelegate handleResponseDelegate, PropagateRequestDelegate propagateRequestDelegate, TerminalManager terminalManager)
+        public CommandRequestHandlingStrategy(HandleResponseDelegate handleResponseDelegate, PropagateRequestDelegate propagateRequestDelegate, TerminalManager terminalManager)
         {
             this.HandleResponseDelegate = handleResponseDelegate;
             this.PropagateRequestDelegate = propagateRequestDelegate;
@@ -27,7 +27,13 @@ namespace Terminal_Distribuido.Strategies
             return requestProtocol.RequestType == RequestType.Command && !requestProtocol.IsResponse;
         }
 
-        public abstract void HandleRequest(byte[] incomingData, int incomingDataByteCount, T protocolObject);
+        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, KnownConnection persistentSocket)
+        {
+            CommandRequestProtocol? commandRequestProtocol = ProcessRequest(incomingData, incomingDataByteCount);
+
+            //continue to propagate request
+            PropagateRequestDelegate(commandRequestProtocol, persistentSocket.Address);
+        }
 
         protected CommandRequestProtocol? ProcessRequest(byte[] incomingData, int incomingDataByteCount)
         {

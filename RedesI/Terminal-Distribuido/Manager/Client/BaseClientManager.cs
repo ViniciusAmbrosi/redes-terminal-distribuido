@@ -1,12 +1,17 @@
 ﻿
+using System.Collections.Concurrent;
 using System.Net;
 using Terminal_Distribuido.Protocols;
+using Terminal_Distribuido.Sockets;
 using Terminal_Distribuido.Terminal;
 
 namespace Terminal_Distribuido.Manager
 {
-    public abstract class BaseClientManager
+    public abstract class BaseClientManager <T>
+        where T : KnownConnection
     {
+        protected T? KnownParentEndpoint { get; set; }
+        protected ConcurrentBag<T> KnownChildEndpoints { get; set; }
         protected TerminalManager TerminalManager { get; set; }
         protected IPAddress ClientIpAddress { get; set; }
         protected RequestManager RequestManager { get; set; }
@@ -19,6 +24,8 @@ namespace Terminal_Distribuido.Manager
             this.ClientIpAddress = Dns.GetHostEntry(Dns.GetHostName()).AddressList[0];
 
             this.RequestManager = new RequestManager(HandleResponseDelegate, PropagateToKnownPeersWithoutLoop, TerminalManager);
+            
+            this.KnownChildEndpoints = new ConcurrentBag<T>();
         }
 
         public virtual void ManageTerminalInput()
@@ -90,10 +97,103 @@ namespace Terminal_Distribuido.Manager
 
         public abstract void StartServer(int serverPort);
 
-        public abstract void PropagateCommandToAllPeers(string command);
+        public void PropagateCommandToAllPeers(string command)
+        {
+            foreach (var childEndpoint in KnownChildEndpoints)
+            {
+                CommandRequestProtocol commandRequest =
+                    new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
 
-        public abstract void HandleResponseDelegate(CommandRequestProtocol response);
+                SendMessage(childEndpoint, commandRequest);
+            }
 
-        public abstract void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address);
+            if (KnownParentEndpoint != null)
+            {
+                CommandRequestProtocol commandRequest =
+                    new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
+
+                SendMessage(KnownParentEndpoint, commandRequest);
+            }
+        }
+
+        public void HandleResponseDelegate(CommandRequestProtocol response)
+        {
+            string targetAddress = response.AddressStack.Pop();
+            string? outgoingPeerAddress = KnownParentEndpoint?.Address?.ToString();
+
+            Console.WriteLine("Trying to respond to {0}", targetAddress);
+            Console.WriteLine("checking against parent {0}", outgoingPeerAddress);
+
+            if (KnownParentEndpoint != null &&
+                outgoingPeerAddress != null &&
+                outgoingPeerAddress.Equals(targetAddress.ToString()))
+            {
+                Console.WriteLine("Sending response request to {0}", outgoingPeerAddress);
+                SendMessage(KnownParentEndpoint, response);
+
+                return;
+            }
+
+            foreach (var childEndpoint in KnownChildEndpoints)
+            {
+                string? incomingPeerAddress = childEndpoint.Address.ToString();
+
+                Console.WriteLine("checking against child {0}", incomingPeerAddress);
+
+                if (incomingPeerAddress.Equals(targetAddress.ToString()))
+                {
+                    Console.WriteLine("Sending response request to {0}", incomingPeerAddress);
+                    SendMessage(childEndpoint, response);
+
+                    return;
+                }
+            }
+        }
+
+        public void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address)
+        {
+            string? outgoingPeerAddress = KnownParentEndpoint?.Address?.ToString();
+
+            if (KnownParentEndpoint != null &&
+                outgoingPeerAddress != null &&
+                !outgoingPeerAddress.Equals(address.ToString()))
+            {
+                CommandRequestProtocol commandRequest =
+                    new CommandRequestProtocol(
+                        request.OriginatorAddress,
+                        null,
+                        new Stack<string>(request.AddressStack),
+                        request.Message,
+                        false);
+
+                commandRequest.AddressStack.Push(ClientIpAddress.ToString());
+
+                Console.WriteLine("Sending propagate request to {0}", outgoingPeerAddress);
+                SendMessage(KnownParentEndpoint, commandRequest);
+            }
+
+            foreach (var childEndpoint in KnownChildEndpoints)
+            {
+                string? incomingPeerAddress = childEndpoint.Address.ToString();
+
+                if (!incomingPeerAddress.Equals(address.ToString()))
+                {
+                    CommandRequestProtocol commandRequest =
+                        new CommandRequestProtocol(
+                            request.OriginatorAddress,
+                            null,
+                            new Stack<string>(request.AddressStack),
+                            request.Message,
+                            false);
+
+                    commandRequest.AddressStack.Push(ClientIpAddress.ToString());
+
+                    Console.WriteLine("Sending propagate request to {0}", incomingPeerAddress);
+                    SendMessage(childEndpoint, commandRequest);
+                }
+            }
+        }
+
+        protected abstract void SendMessage<R> (T endpoint, R request);
     }
 }

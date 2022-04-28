@@ -17,6 +17,8 @@ public class Program
         udpClient.ListenForIncomingSocketConnections();
         udpClient.InitiateOutgoingSocketConnection();
 
+        Console.WriteLine("Started listening for requests");
+
         udpClient.ManageTerminalInput();
     }
 }

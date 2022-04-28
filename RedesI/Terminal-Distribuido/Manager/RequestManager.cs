@@ -1,13 +1,9 @@
 ﻿
-using System.Net;
 using System.Text;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
 using Terminal_Distribuido.Strategies;
-using Terminal_Distribuido.Strategies.Implementations;
-using Terminal_Distribuido.Strategies.Implementations.ConnectionRequest;
-using Terminal_Distribuido.Strategies.Implementations.ConnectionResponse;
 using Terminal_Distribuido.Terminal;
 
 namespace Terminal_Distribuido.Manager
@@ -15,25 +11,18 @@ namespace Terminal_Distribuido.Manager
     public class RequestManager
     {
         private SemaphoreSlim Semaphore = new SemaphoreSlim(1);
-        private List<IRequestHandlingStrategy<SocketMonitor>> tcpRequestHandlingStrategies { get; set; }
-        private List<IRequestHandlingStrategy<IPEndPoint>> udpRequestHandlingStrategies { get; set; }
+        private List<IRequestHandlingStrategy<KnownConnection>> requestHandlingStrategies { get; set; }
 
         public RequestManager(HandleResponseDelegate handleResponseDelegate, PropagateRequestDelegate propagateRequestDelegate, TerminalManager terminalManager)
         {
-            this.tcpRequestHandlingStrategies = new List<IRequestHandlingStrategy<SocketMonitor>>();
+            this.requestHandlingStrategies = new List<IRequestHandlingStrategy<KnownConnection>>();
 
-            this.tcpRequestHandlingStrategies.Add(new TCPConnectionResponseHandlingStrategy());
-            this.tcpRequestHandlingStrategies.Add(new TCPCommandRequestHandlingStrategy(handleResponseDelegate, propagateRequestDelegate, terminalManager));
-            this.tcpRequestHandlingStrategies.Add(new TCPCommandResponseHandlingStrategy(handleResponseDelegate)); 
-            
-            this.udpRequestHandlingStrategies = new List<IRequestHandlingStrategy<IPEndPoint>>();
-
-            this.udpRequestHandlingStrategies.Add(new UDPConnectionResponseHandlingStrategy());
-            this.udpRequestHandlingStrategies.Add(new UDPCommandRequestHandlingStrategy(handleResponseDelegate, propagateRequestDelegate, terminalManager));
-            this.udpRequestHandlingStrategies.Add(new UDPCommandResponseHandlingStrategy(handleResponseDelegate));
+            this.requestHandlingStrategies.Add(new ConnectionResponseHandlingStrategy());
+            this.requestHandlingStrategies.Add(new CommandRequestHandlingStrategy(handleResponseDelegate, propagateRequestDelegate, terminalManager));
+            this.requestHandlingStrategies.Add(new CommandResponseHandlingStrategy(handleResponseDelegate));
         }
 
-        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, IPEndPoint protocolObject)
+        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, KnownConnection protocolObject)
         {
             Semaphore.Wait();
 
@@ -49,7 +38,7 @@ namespace Terminal_Distribuido.Manager
                 return;
             }
 
-            foreach (IRequestHandlingStrategy<IPEndPoint> strategy in udpRequestHandlingStrategies)
+            foreach (IRequestHandlingStrategy<KnownConnection> strategy in requestHandlingStrategies)
             {
                 if (strategy.IsApplicable(genericResponse))
                 {

@@ -6,11 +6,11 @@ using Terminal_Distribuido.Sockets;
 
 namespace Terminal_Distribuido.Strategies
 {
-    public class UDPCommandResponseHandlingStrategy : IRequestHandlingStrategy <IPEndPoint>
+    public class CommandResponseHandlingStrategy : IRequestHandlingStrategy <KnownConnection>
     {
         private HandleResponseDelegate HandleResponseDelegate { get; set; }
 
-        public UDPCommandResponseHandlingStrategy(HandleResponseDelegate handleResponseDelegate)
+        public CommandResponseHandlingStrategy(HandleResponseDelegate handleResponseDelegate)
         {
             this.HandleResponseDelegate = handleResponseDelegate;
         }
@@ -20,7 +20,7 @@ namespace Terminal_Distribuido.Strategies
             return requestProtocol.RequestType == RequestType.Command && requestProtocol.IsResponse;
         }
 
-        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, IPEndPoint persistentSocket)
+        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, KnownConnection persistentSocket)
         {
             CommandRequestProtocol? commandRequestProtocol =
                     ProtocolConverter<CommandRequestProtocol>.ConvertByteArrayToProtocol(incomingData, incomingDataByteCount);

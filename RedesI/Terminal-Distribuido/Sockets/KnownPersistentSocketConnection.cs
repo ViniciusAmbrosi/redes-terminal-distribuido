@@ -9,19 +9,18 @@ namespace Terminal_Distribuido.Sockets
 
     public delegate void HandleResponseDelegate(CommandRequestProtocol response);
 
-    public class SocketMonitor
+    public class KnownPersistentSocketConnection : KnownConnection
     {
         protected Socket SocketConnection { get; set; }
         protected RequestManager RequestManager { get; set; }
-        public IPAddress Address { get; set; }
 
-        public SocketMonitor(
+        public KnownPersistentSocketConnection(
             Socket socketConnection,
-            IPAddress address,
-            RequestManager requestManager)
+            IPEndPoint endpoint,
+            RequestManager requestManager) :
+            base(endpoint)
         {
             this.SocketConnection = socketConnection;
-            this.Address = address;
             this.RequestManager = requestManager;
         }
 
@@ -33,7 +32,7 @@ namespace Terminal_Distribuido.Sockets
                 byte[] incomingData = new byte[10240];
                 int incomingDataByteCount = SocketConnection.Receive(incomingData);
 
-                //RequestManager.HandleRequest(incomingData, incomingDataByteCount, this);
+                RequestManager.HandleRequest(incomingData, incomingDataByteCount, this);
             }
         }
 
