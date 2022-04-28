@@ -57,6 +57,11 @@ namespace Terminal_Distribuido.Manager
                 Console.WriteLine("Provide target environment IP address");
                 string? targetEnvironment = Console.ReadLine();
 
+                if (targetEnvironment.Equals("loopback", StringComparison.OrdinalIgnoreCase))
+                {
+                    targetEnvironment = ClientIpAddress.ToString();
+                }
+
                 Console.WriteLine("Provide target environment port");
                 string? targetPort = Console.ReadLine();
 

@@ -24,7 +24,7 @@ namespace Terminal_Distribuido.Strategies
             }
             else
             {
-                Console.WriteLine("\nUDP: Received network synchronization request from {0} at port {1} [Remote Ip: {2}, Remote Port: {3}]",
+                Console.WriteLine("\nReceived network synchronization request from {0} at port {1} [Remote Ip: {2}, Remote Port: {3}]",
                     protocolObject.Address,
                     protocolObject.Endpoint.Port,
                     connectionRequest.RealIpAddress,
