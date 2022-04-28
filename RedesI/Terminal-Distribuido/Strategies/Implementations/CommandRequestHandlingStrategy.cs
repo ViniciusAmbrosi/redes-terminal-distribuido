@@ -26,12 +26,12 @@ namespace Terminal_Distribuido.Strategies
             return requestProtocol.RequestType == RequestType.Command && !requestProtocol.IsResponse;
         }
 
-        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, KnownConnection persistentSocket)
+        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, KnownConnection connection)
         {
             CommandRequestProtocol? commandRequestProtocol = ProcessRequest(incomingData, incomingDataByteCount);
 
             //continue to propagate request
-            PropagateRequestDelegate(commandRequestProtocol, persistentSocket.Address);
+            PropagateRequestDelegate(commandRequestProtocol, connection.Address);
         }
 
         protected CommandRequestProtocol? ProcessRequest(byte[] incomingData, int incomingDataByteCount)

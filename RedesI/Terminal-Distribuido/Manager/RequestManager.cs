@@ -16,6 +16,7 @@ namespace Terminal_Distribuido.Manager
         {
             this.requestHandlingStrategies = new List<IRequestHandlingStrategy<KnownConnection>>();
 
+            this.requestHandlingStrategies.Add(new ConnectionRequestHandlingStrategy());
             this.requestHandlingStrategies.Add(new ConnectionResponseHandlingStrategy());
             this.requestHandlingStrategies.Add(new CommandRequestHandlingStrategy(handleResponseDelegate, propagateRequestDelegate, terminalManager));
             this.requestHandlingStrategies.Add(new CommandResponseHandlingStrategy(handleResponseDelegate));

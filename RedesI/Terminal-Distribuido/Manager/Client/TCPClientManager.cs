@@ -26,13 +26,18 @@ public class TCPClientManager : BaseClientManager <KnownPersistentSocketConnecti
             {
                 Console.WriteLine("TCP: Socket connected to {0}", sender.RemoteEndPoint?.ToString());
 
-                KnownPersistentSocketConnection socketMonitor = new KnownPersistentSocketConnection(
+                KnownPersistentSocketConnection knownPersistedSocket = new KnownPersistentSocketConnection(
                     sender,
                     remoteEP,
                     RequestManager);
 
-                socketMonitor.CreateMonitoringThread();
-                KnownParentEndpoint = socketMonitor;
+                knownPersistedSocket.CreateMonitoringThread();
+                KnownParentEndpoint = knownPersistedSocket;
+
+                ConnectionRequestProtocol connectionRequest
+                    = new ConnectionRequestProtocol(ClientIpAddress.ToString(), false, ServerListenedPort);
+
+                knownPersistedSocket.SendMessage(ProtocolConverter<ConnectionRequestProtocol>.ConvertPayloadToByteArray(connectionRequest));
             }
         }
         catch (Exception e)
@@ -68,11 +73,6 @@ public class TCPClientManager : BaseClientManager <KnownPersistentSocketConnecti
 
                 persistentSocket.CreateMonitoringThread();
                 KnownChildEndpoints.Add(persistentSocket);
-
-                ConnectionRequestProtocol networkSynzhronizationRequest 
-                    = new ConnectionRequestProtocol(ClientIpAddress.ToString(), true);
-
-                socket.Send(ProtocolConverter<ConnectionRequestProtocol>.ConvertPayloadToByteArray(networkSynzhronizationRequest));
             }
         }
         catch (Exception e)
