@@ -62,7 +62,7 @@ namespace Terminal_Distribuido.Manager
                     int incomingDataByteCount = listener.ReceiveFrom(incomingData, ref tempTargetEndpoint);
 
                     IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)tempTargetEndpoint).Address.ToString());
-                    IPEndPoint? endpoint = GetKnownChildEndpoint(sourceIp);
+                    IPEndPoint? endpoint = GetKnownEndpoint(sourceIp);
 
                     if (endpoint != null)
                     {
@@ -108,17 +108,6 @@ namespace Terminal_Distribuido.Manager
             }
         }
 
-        private IPEndPoint? GetKnownChildEndpoint(IPAddress sourceIp)
-        {
-            if (KnownParentEndpoint != null &&
-                KnownParentEndpoint.Address.ToString().Equals(sourceIp.ToString()))
-            {
-                return KnownParentEndpoint;
-            }
-
-            return KnownChildEndpoints.Where(endpoint => endpoint.Address.ToString().Equals(sourceIp.ToString())).FirstOrDefault();
-        }
-
         public override void PropagateCommandToAllPeers(string command)
         {
             foreach (var childEndpoint in KnownChildEndpoints)
@@ -140,10 +129,10 @@ namespace Terminal_Distribuido.Manager
 
         public override void HandleResponseDelegate(CommandRequestProtocol response)
         {
-            string targetAddress = response.AddressStack.Count == 0 ? response.OriginatorAddress : response.AddressStack.Pop();
+            string targetAddress = response.AddressStack.Pop();
             string? outgoingPeerAddress = KnownParentEndpoint?.Address?.ToString();
 
-            Console.WriteLine("trying to respond to {0}", targetAddress);
+            Console.WriteLine("Trying to respond to {0}", targetAddress);
             Console.WriteLine("checking against parent {0}", outgoingPeerAddress);
 
             if (KnownParentEndpoint != null &&
@@ -174,7 +163,57 @@ namespace Terminal_Distribuido.Manager
 
         public override void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address)
         {
-            Console.WriteLine("Do nothing");
+            string? outgoingPeerAddress = KnownParentEndpoint?.Address?.ToString();
+
+            if (KnownParentEndpoint != null &&
+                outgoingPeerAddress != null &&
+                !outgoingPeerAddress.Equals(address.ToString()))
+            {
+                CommandRequestProtocol commandRequest =
+                    new CommandRequestProtocol(
+                        request.OriginatorAddress,
+                        null,
+                        new Stack<string>(request.AddressStack),
+                        request.Message,
+                        false);
+
+                commandRequest.AddressStack.Push(ClientIpAddress.ToString());
+
+                Console.WriteLine("Sending propagate request to {0}", outgoingPeerAddress);
+                SendMessage(KnownParentEndpoint, commandRequest);
+            }
+
+            foreach (var childEndpoint in KnownChildEndpoints)
+            {
+                string? incomingPeerAddress = childEndpoint.Address.ToString();
+
+                if (!incomingPeerAddress.Equals(address.ToString()))
+                {
+                    CommandRequestProtocol commandRequest =
+                        new CommandRequestProtocol(
+                            request.OriginatorAddress,
+                            null,
+                            new Stack<string>(request.AddressStack),
+                            request.Message,
+                            false);
+
+                    commandRequest.AddressStack.Push(ClientIpAddress.ToString());
+
+                    Console.WriteLine("Sending propagate request to {0}", incomingPeerAddress);
+                    SendMessage(childEndpoint, commandRequest);
+                }
+            }
+        }
+
+        private IPEndPoint? GetKnownEndpoint(IPAddress sourceIp)
+        {
+            if (KnownParentEndpoint != null &&
+                KnownParentEndpoint.Address.ToString().Equals(sourceIp.ToString()))
+            {
+                return KnownParentEndpoint;
+            }
+
+            return KnownChildEndpoints.Where(endpoint => endpoint.Address.ToString().Equals(sourceIp.ToString())).FirstOrDefault();
         }
 
         private void SendMessage<T>(IPEndPoint endpoint, T request)
