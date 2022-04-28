@@ -7,15 +7,15 @@ using Terminal_Distribuido.Terminal;
 
 namespace Terminal_Distribuido.Strategies
 {
-    public class CommandRequestHandlingStrategy : IRequestHandlingStrategy
+    public abstract class BaseCommandRequestHandlingStrategy<T> : IRequestHandlingStrategy <T>
     {
-        private HandleResponseDelegate HandleResponseDelegate { get; set; }
+        protected HandleResponseDelegate HandleResponseDelegate { get; set; }
 
-        private PropagateRequestDelegate PropagateRequestDelegate { get; set; }
+        protected PropagateRequestDelegate PropagateRequestDelegate { get; set; }
 
-        private TerminalManager TerminalManager { get; set; }
+        protected TerminalManager TerminalManager { get; set; }
 
-        public CommandRequestHandlingStrategy(HandleResponseDelegate handleResponseDelegate, PropagateRequestDelegate propagateRequestDelegate, TerminalManager terminalManager)
+        public BaseCommandRequestHandlingStrategy(HandleResponseDelegate handleResponseDelegate, PropagateRequestDelegate propagateRequestDelegate, TerminalManager terminalManager)
         {
             this.HandleResponseDelegate = handleResponseDelegate;
             this.PropagateRequestDelegate = propagateRequestDelegate;
@@ -27,19 +27,22 @@ namespace Terminal_Distribuido.Strategies
             return requestProtocol.RequestType == RequestType.Command && !requestProtocol.IsResponse;
         }
 
-        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, PersistentSocket persistentSocket)
+        public abstract void HandleRequest(byte[] incomingData, int incomingDataByteCount, T protocolObject);
+
+        protected CommandRequestProtocol? ProcessRequest(byte[] incomingData, int incomingDataByteCount)
         {
             CommandRequestProtocol? commandRequestProtocol =
-                    ProtocolConverter<CommandRequestProtocol>.ConvertByteArrayToProtocol(incomingData, incomingDataByteCount);
+                ProtocolConverter<CommandRequestProtocol>.ConvertByteArrayToProtocol(incomingData, incomingDataByteCount);
 
             if (commandRequestProtocol == null)
             {
                 Console.WriteLine("Can't process command request procol");
+                return null;
             }
             else
             {
                 Console.WriteLine("\n-- -- -- -- -- -- -- -- -- -- -- -- --");
-                Console.WriteLine("\nTriggering remote command [{0}] execution triggered by [{1}]", 
+                Console.WriteLine("\nTriggering remote command [{0}] execution triggered by [{1}]",
                     commandRequestProtocol.Message,
                     commandRequestProtocol.OriginatorAddress);
 
@@ -49,15 +52,15 @@ namespace Terminal_Distribuido.Strategies
                 //respond to caller
                 CommandRequestProtocol responseRequest =
                     new CommandRequestProtocol(commandRequestProtocol.OriginatorAddress,
-                        Dns.GetHostEntry(Dns.GetHostName()).AddressList[0].ToString(), 
-                        new Stack<string>(commandRequestProtocol.AddressStack), 
-                        response, 
+                        Dns.GetHostEntry(Dns.GetHostName()).AddressList[0].ToString(),
+                        new Stack<string>(commandRequestProtocol.AddressStack),
+                        response,
                         true);
 
                 HandleResponseDelegate(responseRequest);
-
+                
                 //continue to propagate request
-                PropagateRequestDelegate(commandRequestProtocol, persistentSocket.Address);
+                return commandRequestProtocol;
             }
         }
     }

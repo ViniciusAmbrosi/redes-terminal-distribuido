@@ -14,8 +14,8 @@ public class Program
 
         UDPClientManager udpClient = new UDPClientManager();
 
-        udpClient.InitiateOutgoingSocketConnection();
         udpClient.ListenForIncomingSocketConnections();
+        udpClient.InitiateOutgoingSocketConnection();
 
         udpClient.ManageTerminalInput();
     }

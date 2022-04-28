@@ -1,15 +1,16 @@
 ﻿
+using System.Net;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
 
 namespace Terminal_Distribuido.Strategies
 {
-    public class CommandResponseHandlingStrategy : IRequestHandlingStrategy
+    public class UDPCommandResponseHandlingStrategy : IRequestHandlingStrategy <IPEndPoint>
     {
         private HandleResponseDelegate HandleResponseDelegate { get; set; }
 
-        public CommandResponseHandlingStrategy(HandleResponseDelegate handleResponseDelegate)
+        public UDPCommandResponseHandlingStrategy(HandleResponseDelegate handleResponseDelegate)
         {
             this.HandleResponseDelegate = handleResponseDelegate;
         }
@@ -19,7 +20,7 @@ namespace Terminal_Distribuido.Strategies
             return requestProtocol.RequestType == RequestType.Command && requestProtocol.IsResponse;
         }
 
-        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, PersistentSocket persistentSocket)
+        public void HandleRequest(byte[] incomingData, int incomingDataByteCount, IPEndPoint persistentSocket)
         {
             CommandRequestProtocol? commandRequestProtocol =
                     ProtocolConverter<CommandRequestProtocol>.ConvertByteArrayToProtocol(incomingData, incomingDataByteCount);

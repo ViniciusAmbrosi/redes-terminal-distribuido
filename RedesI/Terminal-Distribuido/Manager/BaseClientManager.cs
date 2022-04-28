@@ -10,6 +10,7 @@ namespace Terminal_Distribuido.Manager
         protected TerminalManager TerminalManager { get; set; }
         protected IPAddress ClientIpAddress { get; set; }
         protected RequestManager RequestManager { get; set; }
+        protected int ServerListenedPort { get; set; }
 
         protected BaseClientManager()
         {
@@ -42,23 +43,29 @@ namespace Terminal_Distribuido.Manager
 
         public void InitiateOutgoingSocketConnection()
         {
-            Console.WriteLine("Provide target environment IP address");
-            string? targetEnvironment = Console.ReadLine();
+            Console.WriteLine("Should connect to another client (N/Y)?");
+            string? shouldConnect = Console.ReadLine();
 
-            Console.WriteLine("Provide target environment port");
-            string? targetPort = Console.ReadLine();
-
-            int port = 0;
-
-            if (String.IsNullOrEmpty(targetEnvironment) ||
-                String.IsNullOrEmpty(targetPort) ||
-                !int.TryParse(targetPort, out port))
+            if ("Y".Equals(shouldConnect, StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine("No target IP or port provided, continuing as client only.");
-                return;
-            }
+                Console.WriteLine("Provide target environment IP address");
+                string? targetEnvironment = Console.ReadLine();
 
-            StartClient(targetEnvironment, port);
+                Console.WriteLine("Provide target environment port");
+                string? targetPort = Console.ReadLine();
+
+                int port = 0;
+
+                if (String.IsNullOrEmpty(targetEnvironment) ||
+                    String.IsNullOrEmpty(targetPort) ||
+                    !int.TryParse(targetPort, out port))
+                {
+                    Console.WriteLine("No target IP or port provided, continuing as client only.");
+                    return;
+                }
+
+                StartClient(targetEnvironment, port);
+            }
         }
 
         public void ListenForIncomingSocketConnections()
@@ -72,6 +79,8 @@ namespace Terminal_Distribuido.Manager
                 Console.WriteLine("Server port not provided. Interrupting flow.");
                 return;
             }
+
+            this.ServerListenedPort = port;
 
             Thread maintainedSocketThread = new Thread(() => StartServer(port));
             maintainedSocketThread.Start();

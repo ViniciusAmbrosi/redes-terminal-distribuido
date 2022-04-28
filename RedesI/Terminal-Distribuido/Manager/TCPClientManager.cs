@@ -9,13 +9,13 @@ using Terminal_Distribuido.Terminal;
 
 public class TCPClientManager : BaseClientManager
 {
-    private OutgoingPersistentSocket? OutgoingPeer { get; set; }
-    private ConcurrentDictionary<string, IncomingPersistentSocket> IncomingPeers { get; set; }
+    protected SocketMonitor? OutgoingPeer { get; set; }
+    protected ConcurrentDictionary<string, SocketMonitor> IncomingPeers { get; set; }
 
     public TCPClientManager() :
         base()
     {
-        this.IncomingPeers = new ConcurrentDictionary<string, IncomingPersistentSocket>();
+        this.IncomingPeers = new ConcurrentDictionary<string, SocketMonitor>();
     }
 
     public override void StartClient(string targetEnvironment, int port)
@@ -32,13 +32,13 @@ public class TCPClientManager : BaseClientManager
             {
                 Console.WriteLine("Socket connected to {0}", sender.RemoteEndPoint?.ToString());
 
-                OutgoingPersistentSocket persistent = new OutgoingPersistentSocket(
+                SocketMonitor socketMonitor = new SocketMonitor(
                     sender,
                     ipAddress,
                     RequestManager);
 
-                persistent.CreateMonitoringThread();
-                OutgoingPeer = persistent;
+                socketMonitor.CreateMonitoringThread();
+                OutgoingPeer = socketMonitor;
             }
         }
         catch (Exception e)
@@ -68,7 +68,7 @@ public class TCPClientManager : BaseClientManager
                 IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString());
                 Console.WriteLine("\nReceived connection request from {0}", sourceIp.ToString());
 
-                IncomingPersistentSocket persistentSocket  = new IncomingPersistentSocket(
+                SocketMonitor persistentSocket  = new SocketMonitor(
                     socket,
                     sourceIp,
                     RequestManager);
@@ -76,10 +76,10 @@ public class TCPClientManager : BaseClientManager
                 persistentSocket.CreateMonitoringThread();
                 IncomingPeers.TryAdd(sourceIp.ToString(), persistentSocket);
 
-                NetworkSynzhronizationRequestProtocol networkSynzhronizationRequest 
-                    = new NetworkSynzhronizationRequestProtocol(ClientIpAddress.ToString());
+                ConnectionRequestProtocol networkSynzhronizationRequest 
+                    = new ConnectionRequestProtocol(ClientIpAddress.ToString(), true);
 
-                socket.Send(ProtocolConverter<NetworkSynzhronizationRequestProtocol>.ConvertPayloadToByteArray(networkSynzhronizationRequest));
+                socket.Send(ProtocolConverter<ConnectionRequestProtocol>.ConvertPayloadToByteArray(networkSynzhronizationRequest));
             }
         }
         catch (Exception e)

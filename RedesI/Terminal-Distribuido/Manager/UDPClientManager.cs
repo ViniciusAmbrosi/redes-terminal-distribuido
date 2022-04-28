@@ -1,16 +1,21 @@
 ﻿
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
+using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 
 namespace Terminal_Distribuido.Manager
 {
     public class UDPClientManager : BaseClientManager
     {
+        protected IPEndPoint? KnownParentEndpoint { get; set; }
+        protected ConcurrentBag<IPEndPoint> KnownChildEndpoints { get; set; }
+
         public UDPClientManager() :
             base()
         {
+            this.KnownChildEndpoints = new ConcurrentBag<IPEndPoint>();
         }
 
         public override void StartClient(string targetEnvironment, int targetPort)
@@ -22,10 +27,15 @@ namespace Terminal_Distribuido.Manager
 
                 Socket sender = new Socket(ipAddress.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
 
-                byte[] sendbuf = Encoding.ASCII.GetBytes("Connect me!");
+                ConnectionRequestProtocol connectionRequest
+                    = new ConnectionRequestProtocol(ClientIpAddress.ToString(), false, ServerListenedPort);
+
+                byte[] sendbuf = ProtocolConverter<ConnectionRequestProtocol>.ConvertPayloadToByteArray(connectionRequest);
                 sender.SendTo(sendbuf, remoteEP);
 
                 Console.WriteLine("Socket connected to {0}", remoteEP.ToString());
+
+                this.KnownParentEndpoint = remoteEP;
             }
             catch (Exception e)
             {
@@ -46,33 +56,131 @@ namespace Terminal_Distribuido.Manager
 
                 while (true)
                 {
+                    EndPoint tempTargetEndpoint = new IPEndPoint(ClientIpAddress, serverPort);
+
                     byte[] incomingData = new byte[10240];
-                    int incomingDataByteCount = listener.ReceiveFrom(incomingData, ref localEndPoint);
+                    int incomingDataByteCount = listener.ReceiveFrom(incomingData, ref tempTargetEndpoint);
 
-                    Console.WriteLine("\nReceived connection request");
+                    IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)tempTargetEndpoint).Address.ToString());
+                    IPEndPoint? endpoint = GetKnownChildEndpoint(sourceIp);
 
-                    IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)localEndPoint).Address.ToString());
-                    Console.WriteLine("\nReceived connection request from {0}", sourceIp.ToString());
+                    if (endpoint != null)
+                    {
+                        Console.WriteLine("Processing Request");
+                        RequestManager.HandleRequest(incomingData, incomingDataByteCount, endpoint);
+                    }
+                    else
+                    {
+                        ConnectionRequestProtocol? connectionRequest
+                            = ProtocolConverter<ConnectionRequestProtocol>.ConvertByteArrayToProtocol(incomingData, incomingDataByteCount);
+
+                        if (connectionRequest != null)
+                        {
+                            Console.WriteLine("\nReceived new connection request from {0} at port {1} [Remote Ip: {2}, Remote Port: {3}]",
+                                sourceIp.ToString(),
+                                ((IPEndPoint)tempTargetEndpoint).Port,
+                                connectionRequest.RealIpAddress,
+                                connectionRequest.ListenedPort);
+
+                            EndPoint realRemoteEndpoint = new IPEndPoint(
+                                IPAddress.Parse(connectionRequest.RealIpAddress),
+                                connectionRequest.ListenedPort);
+
+                            KnownChildEndpoints.Add((IPEndPoint)realRemoteEndpoint);
+
+                            ConnectionRequestProtocol connectionResponse
+                                = new ConnectionRequestProtocol(ClientIpAddress.ToString(), true);
+
+                            listener.SendTo(
+                                ProtocolConverter<ConnectionRequestProtocol>.ConvertPayloadToByteArray(connectionResponse),
+                                realRemoteEndpoint);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Connection Request is Invalid. Denying service.");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
-            { 
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
+
+        private IPEndPoint? GetKnownChildEndpoint(IPAddress sourceIp)
+        {
+            if (KnownParentEndpoint != null &&
+                KnownParentEndpoint.Address.ToString().Equals(sourceIp.ToString()))
+            {
+                return KnownParentEndpoint;
+            }
+
+            return KnownChildEndpoints.Where(endpoint => endpoint.Address.ToString().Equals(sourceIp.ToString())).FirstOrDefault();
+        }
+
+        public override void PropagateCommandToAllPeers(string command)
+        {
+            foreach (var childEndpoint in KnownChildEndpoints)
+            {
+                CommandRequestProtocol commandRequest =
+                    new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
+
+                SendMessage(childEndpoint, commandRequest);
+            }
+
+            if (KnownParentEndpoint != null)
+            {
+                CommandRequestProtocol commandRequest =
+                    new CommandRequestProtocol(ClientIpAddress.ToString(), ClientIpAddress.ToString(), command, false);
+
+                SendMessage(KnownParentEndpoint, commandRequest);
             }
         }
 
         public override void HandleResponseDelegate(CommandRequestProtocol response)
         {
-            throw new NotImplementedException();
-        }
+            string targetAddress = response.AddressStack.Count == 0 ? response.OriginatorAddress : response.AddressStack.Pop();
+            string? outgoingPeerAddress = KnownParentEndpoint?.Address?.ToString();
 
-        public override void PropagateCommandToAllPeers(string command)
-        {
-            throw new NotImplementedException();
+            Console.WriteLine("trying to respond to {0}", targetAddress);
+            Console.WriteLine("checking against parent {0}", outgoingPeerAddress);
+
+            if (KnownParentEndpoint != null &&
+                outgoingPeerAddress != null &&
+                outgoingPeerAddress.Equals(targetAddress.ToString()))
+            {
+                Console.WriteLine("Sending response request to {0}", outgoingPeerAddress);
+                SendMessage(KnownParentEndpoint, response);
+
+                return;
+            }
+
+            foreach (var childEndpoint in KnownChildEndpoints)
+            {
+                string? incomingPeerAddress = childEndpoint.Address.ToString();
+
+                Console.WriteLine("checking against child {0}", incomingPeerAddress);
+
+                if (incomingPeerAddress.Equals(targetAddress.ToString()))
+                {
+                    Console.WriteLine("Sending response request to {0}", incomingPeerAddress);
+                    SendMessage(childEndpoint, response);
+
+                    return;
+                }
+            }
         }
 
         public override void PropagateToKnownPeersWithoutLoop(CommandRequestProtocol request, IPAddress address)
         {
-            throw new NotImplementedException();
+            Console.WriteLine("Do nothing");
+        }
+
+        private void SendMessage<T>(IPEndPoint endpoint, T request)
+        {
+            Socket sender = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            sender.SendTo(ProtocolConverter<T>.ConvertPayloadToByteArray(request), endpoint);
         }
     }
 }
