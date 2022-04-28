@@ -1,5 +1,4 @@
-﻿
-using System.Text;
+﻿using System.Text;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;

@@ -1,6 +1,4 @@
-﻿
-using System.Net;
-using Terminal_Distribuido.Converters;
+﻿using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;
 

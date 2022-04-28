@@ -1,5 +1,4 @@
-﻿
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using Terminal_Distribuido.Protocols;
 using Terminal_Distribuido.Sockets;

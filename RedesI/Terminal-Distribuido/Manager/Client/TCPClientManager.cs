@@ -1,5 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Manager;
@@ -25,7 +24,7 @@ public class TCPClientManager : BaseClientManager <KnownPersistentSocketConnecti
 
             if (sender != null)
             {
-                Console.WriteLine("Socket connected to {0}", sender.RemoteEndPoint?.ToString());
+                Console.WriteLine("TCP: Socket connected to {0}", sender.RemoteEndPoint?.ToString());
 
                 KnownPersistentSocketConnection socketMonitor = new KnownPersistentSocketConnection(
                     sender,
@@ -60,7 +59,7 @@ public class TCPClientManager : BaseClientManager <KnownPersistentSocketConnecti
                 socket = listener.Accept();
 
                 IPAddress sourceIp = IPAddress.Parse(((IPEndPoint)socket.RemoteEndPoint).Address.ToString());
-                Console.WriteLine("\nReceived connection request from {0}", sourceIp.ToString());
+                Console.WriteLine("\nTCP: Received connection request from {0}", sourceIp.ToString());
 
                 KnownPersistentSocketConnection persistentSocket  = new KnownPersistentSocketConnection(
                     socket,

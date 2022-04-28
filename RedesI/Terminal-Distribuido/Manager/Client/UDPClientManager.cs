@@ -1,5 +1,4 @@
-﻿
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using Terminal_Distribuido.Converters;
 using Terminal_Distribuido.Protocols;
@@ -29,7 +28,7 @@ namespace Terminal_Distribuido.Manager
                 byte[] sendbuf = ProtocolConverter<ConnectionRequestProtocol>.ConvertPayloadToByteArray(connectionRequest);
                 sender.SendTo(sendbuf, remoteEP);
 
-                Console.WriteLine("Socket connected to {0}", remoteEP.ToString());
+                Console.WriteLine("UDP: Socket connected to {0}", remoteEP.ToString());
 
                 this.KnownParentEndpoint = new KnownConnection(remoteEP);
             }
@@ -69,7 +68,7 @@ namespace Terminal_Distribuido.Manager
 
                         if (connectionRequest != null)
                         {
-                            Console.WriteLine("\nReceived new connection request from {0} at port {1} [Remote Ip: {2}, Remote Port: {3}]",
+                            Console.WriteLine("\nUDP: Received new connection request from {0} at port {1} [Remote Ip: {2}, Remote Port: {3}]",
                                 sourceIp.ToString(),
                                 ((IPEndPoint)tempTargetEndpoint).Port,
                                 connectionRequest.RealIpAddress,
