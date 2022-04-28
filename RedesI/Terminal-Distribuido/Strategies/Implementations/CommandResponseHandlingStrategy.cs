@@ -33,7 +33,9 @@ namespace Terminal_Distribuido.Strategies
                 Console.WriteLine(commandRequestProtocol.Message);
             }
             else
-            {
+            { 
+                Console.WriteLine("Reodering stack");
+                commandRequestProtocol.ReorderStack();
                 HandleResponseDelegate(commandRequestProtocol);
             }
         }
